@@ -201,8 +201,36 @@ int main(void){
                 
                 break;
 
+            // 2->0 (c 3 추가)
+            case MAINSTATE_ACK:
+
+                if (arqEvent_checkEventFlag(arqEvent_ackRcvd))  // c : ACK 수신
+                {
+                    // 1. 받은 ACK의 seqNum 확인 (내가 보낸 것과 일치하는지)
+                    uint8_t* dataPtr = arqLLI_getRcvdDataPtr();
+                    uint8_t rcvdAckSn = arqMsg_getSeq(dataPtr);
+                    if (rcvdAckSn == (seqNum - 1) % ARQMSSG_MAX_SEQNUM)  // 내 seq와 맞으면
+                    {
+                        // 2. timer 정지
+                        arqTimer_stopTimer();
+                        
+                        // 3. 상태 전이
+                        main_state = MAINSTATE_IDLE; //다음 루프 iteration에서 IDLE case로 들어가게 해줌
+                        flag_needPrint = 1;
+                        
+                        pc.printf("[MAIN] ACK confirmed (seq:%i) → IDLE\n", rcvdAckSn);
+                    }
+                    // seq 불일치면 무시 (오래된 ACK)
+                    
+                    arqEvent_clearEventFlag(arqEvent_ackRcvd);
+                }
+                
+                break;
+
             default :
                 break;
         }
+
+
     }
 }
