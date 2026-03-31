@@ -108,9 +108,10 @@ int main(void){
         {
             case MAINSTATE_IDLE: //IDLE state description
                 
+                // 이벤트 A (SDU 수신) 처리
                 if (arqEvent_checkEventFlag(arqEvent_dataToSend)) //if data needs to be sent (keyboard input)
                 {
-                    //msg header setting
+                    // msg header setting ( PDU 생성 및 전송 )
                     pduSize = arqMsg_encodeData(arqPdu, originalWord, seqNum, wordLen);
                     arqLLI_sendData(arqPdu, pduSize, dest_ID);
 
@@ -125,6 +126,7 @@ int main(void){
                     wordLen = 0;
                     arqEvent_clearEventFlag(arqEvent_dataToSend);
                 }
+                // 이벤트 D (PDU 수신) 처리
                 else if (arqEvent_checkEventFlag(arqEvent_dataRcvd)) //if data reception event happens
                 {
                     //Retrieving data info.
@@ -136,6 +138,7 @@ int main(void){
                     pc.printf("\n -------------------------------------------------\nRCVD from %i : %s (length:%i, seq:%i)\n -------------------------------------------------\n", 
                                 srcId, arqMsg_getWord(dataPtr), size, arqMsg_getSeq(dataPtr));
 
+                    // ACK PDU 생성 및 전송
                     pduSize = arqMsg_encodeAck(arqAck, rcvdSn);
                     arqLLI_sendData(arqAck, pduSize, srcId);
 
@@ -169,17 +172,18 @@ int main(void){
                 break;
 
             case MAINSTATE_TX: //IDLE state description
-
-                if (arqEvent_checkEventFlag(arqEvent_dataTxDone)) //data TX finished
+                // 이벤트 B (data TX 완료) 처리
+                if (arqEvent_checkEventFlag(arqEvent_dataTxDone)) 
                 {
-                    arqTimer_startTimer();
+                    arqTimer_startTimer(); //ARQ 타이머 시작 (ACK 수신 대기)
 
                     main_state = MAINSTATE_ACK;
                     arqEvent_clearEventFlag(arqEvent_dataTxDone);
                 }
+                // 이벤트 E (ACK TX 완료) 처리
                 if (arqEvent_checkEventFlag(arqEvent_ackTxDone)) //data TX finished
                 {
-                    if (arqTimer_getTimerStatus())
+                    if (arqTimer_getTimerStatus())  // 조건C2: ACK 수신 대기 중 ACK 전송 완료 -> ACK 수신 대기 계속 
                     {
                         main_state = MAINSTATE_ACK;
                     }
