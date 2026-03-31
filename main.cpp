@@ -20,8 +20,8 @@ Serial pc(USBTX, USBRX);
 uint8_t main_state = MAINSTATE_IDLE; //protocol state
 
 //source/destination ID
-uint8_t endNode_ID=1;
-uint8_t dest_ID=0;
+uint8_t endNode_ID=33;
+uint8_t dest_ID=22;
 
 //PDU context/size
 uint8_t arqPdu[200];
@@ -76,20 +76,12 @@ int main(void){
     //initialization
     pc.printf("------------------ ARQ protocol starts! --------------------------\n");
     arqEvent_clearAllEventFlag();
-    
-    //source & destination ID setting
-    pc.printf(":: ID for this node : ");
-    pc.scanf("%d", &endNode_ID);
-    pc.printf(":: ID for the destination : ");
-    pc.scanf("%d", &dest_ID);
-    pc.getc();
+
 
     pc.printf("endnode : %i, dest : %i\n", endNode_ID, dest_ID);
 
     arqLLI_initLowLayer(endNode_ID);
     pc.attach(&arqMain_processInputWord, Serial::RxIrq);
-
-
 
 
 
@@ -207,29 +199,60 @@ int main(void){
 
             // 2->0 (c 3 추가)
             case MAINSTATE_ACK:
-
-                if (arqEvent_checkEventFlag(arqEvent_ackRcvd))  // c : ACK 수신
+                // 이벤트 C (ACK 수신) 처리
+                if (arqEvent_checkEventFlag(arqEvent_ackRcvd)) 
                 {
-                    // 1. 받은 ACK의 seqNum 확인 (내가 보낸 것과 일치하는지)
-                    uint8_t* dataPtr = arqLLI_getRcvdDataPtr();
-                    uint8_t rcvdAckSn = arqMsg_getSeq(dataPtr);
-                    if (rcvdAckSn == (seqNum - 1) % ARQMSSG_MAX_SEQNUM)  // 내 seq와 맞으면
-                    {
-                        // 2. timer 정지
-                        arqTimer_stopTimer();
-                        
-                        // 3. 상태 전이
-                        main_state = MAINSTATE_IDLE; //다음 루프 iteration에서 IDLE case로 들어가게 해줌
-                        flag_needPrint = 1;
-                        
-                        pc.printf("[MAIN] ACK confirmed (seq:%i) → IDLE\n", rcvdAckSn);
-                    }
-                    // seq 불일치면 무시 (오래된 ACK)
-                    
+                    arqTimer_stopTimer();
+                    main_state = MAINSTATE_IDLE;
+
                     arqEvent_clearEventFlag(arqEvent_ackRcvd);
                 }
-                
-                break;
+                // 이벤트 D (PDU 수신) 처리
+                else if (arqEvent_checkEventFlag(arqEvent_dataRcvd)) 
+                {
+                    uint8_t srcId = arqLLI_getSrcId();
+                    uint8_t* dataPtr = arqLLI_getRcvdDataPtr();
+                    uint8_t size = arqLLI_getSize();
+                    uint8_t rcvdSn = arqMsg_getSeq(dataPtr);
+
+                    pc.printf("\n -------------------------------------------------\nRCVD from %i : %s (length:%i, seq:%i)\n -------------------------------------------------\n", 
+                                srcId, arqMsg_getWord(dataPtr), size, arqMsg_getSeq(dataPtr));
+
+                    // ACK PDU 생성 및 전송
+                    pduSize = arqMsg_encodeAck(arqAck, rcvdSn);
+                    arqLLI_sendData(arqAck, pduSize, srcId);
+
+                    main_state = MAINSTATE_TX;
+                    arqEvent_clearEventFlag(arqEvent_dataRcvd);
+                }
+                // 이벤트 F (ARQ 타임아웃) 처리
+                else if (arqEvent_checkEventFlag(arqEvent_arqTimeout))  
+                {
+                    if(retxCnt < ARQ_MAXRETRANSMISSION)  // 조건C1: 재전송 횟수 아직 남음 -> 데이터 재전송
+                    {
+                        
+                        arqLLI_sendData(arqPdu, pduSize, dest_ID);
+                        pc.printf("[MAIN] retransmit to %i (seq:%i)\n", dest_ID, seqNum%ARQMSSG_MAX_SEQNUM);
+                        retxCnt++;
+
+                        main_state = MAINSTATE_TX;
+                    }
+                    else
+                    {
+                        pc.printf("[MAIN] give up retransmission!\n");
+                        main_state = MAINSTATE_IDLE;
+                    }
+
+                    arqEvent_clearEventFlag(arqEvent_arqTimeout);
+                }
+                else if (arqEvent_checkEventFlag(arqEvent_dataTxDone)) 
+                {
+                    arqEvent_clearEventFlag(arqEvent_dataTxDone);
+                }
+                else if (arqEvent_checkEventFlag(arqEvent_ackTxDone)) 
+                {
+                    arqEvent_clearEventFlag(arqEvent_ackTxDone);
+                }
 
             default :
                 break;
