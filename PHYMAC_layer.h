@@ -9,4 +9,7 @@
 
 
 int phymac_dataReq(uint8_t* dataPtr, uint8_t size, uint8_t destId);
-void phymac_init(uint8_t id, void (*dataCnfFunc)(int), void (*dataIndFunc)(uint8_t, uint8_t*, uint8_t));
+void phymac_init(uint8_t id, void (*dataCnfFunc)(int), void (*dataIndFunc)(uint8_t, uint8_t*, uint8_t, uint8_t));
+int16_t phymac_getDataRssi(void);
+int8_t phymac_getDataSnr(void);
+int phymac_configSrcId(uint8_t id);

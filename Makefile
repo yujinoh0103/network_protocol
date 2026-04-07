@@ -39,7 +39,7 @@ VPATH = ..
 ###############################################################################
 # Project settings
 
-PROJECT := ARQEntity
+PROJECT := myProtocol
 
 
 # Project settings
@@ -47,10 +47,16 @@ PROJECT := ARQEntity
 # Objects and Paths
 
 OBJECTS += main.o
-OBJECTS += ARQ_msg.o
-OBJECTS += ARQ_FSMevent.o
-OBJECTS += ARQ_LLinterface.o
-OBJECTS += ARQ_timer.o
+OBJECTS += L2_FSMmain.o
+OBJECTS += L2_msg.o
+OBJECTS += L2_FSMevent.o
+OBJECTS += L2_LLinterface.o
+OBJECTS += L2_timer.o
+OBJECTS += L3_FSMmain.o
+OBJECTS += L3_msg.o
+OBJECTS += L3_FSMevent.o
+OBJECTS += L3_LLinterface.o
+OBJECTS += L3_timer.o
 
  SYS_OBJECTS += lib/Rx_HAL.o
  SYS_OBJECTS += lib/Rx_HHI.o
@@ -59,6 +65,7 @@ OBJECTS += ARQ_timer.o
  SYS_OBJECTS += lib/Common_HAL.o
  SYS_OBJECTS += lib/Common_HHI.o
  SYS_OBJECTS += lib/PHYMAC_layer.o
+ SYS_OBJECTS += lib/HAL_FSM.o
  SYS_OBJECTS += mbed/TARGET_NUCLEO_F446RE/TOOLCHAIN_GCC_ARM/PeripheralPins.o
  SYS_OBJECTS += mbed/TARGET_NUCLEO_F446RE/TOOLCHAIN_GCC_ARM/analogin_api.o
  SYS_OBJECTS += mbed/TARGET_NUCLEO_F446RE/TOOLCHAIN_GCC_ARM/analogin_device.o
@@ -297,6 +304,7 @@ CXX_FLAGS += -Wvla
 CXX_FLAGS += -include
 CXX_FLAGS += mbed_config.h
 CXX_FLAGS += -D__MBED__=1
+#CXX_FLAGS += -DDISABLE_ARQ
 CXX_FLAGS += -DDEVICE_I2CSLAVE=1
 CXX_FLAGS += -D__FPU_PRESENT=1
 CXX_FLAGS += -DDEVICE_PORTOUT=1
