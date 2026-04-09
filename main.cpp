@@ -6,6 +6,40 @@
 //serial port interface
 Serial pc(USBTX, USBRX);
 
+uint8_t getID() {
+    char c;
+    char rx_buffer[4];
+    int rx_index = 0;
+
+    while (1)
+    {
+        c = pc.getc();
+
+        // 처음 들어온 개행문자는 무시
+        if ((c == '\n' || c == '\r') && rx_index == 0) {
+            continue;
+        }
+
+        // 엔터 입력 시 문자열 종료
+        if (c == '\n' || c == '\r') {
+            rx_buffer[rx_index] = '\0';
+            break;
+        }
+
+        // 숫자만 저장
+        if (c >= '0' && c <= '9') {
+            if (rx_index < 3) {
+                rx_buffer[rx_index++] = c;
+                pc.putc(c);   // 입력한 숫자 에코 출력
+            }
+        }
+    }
+
+    pc.printf("\n");
+    return (uint8_t)atoi(rx_buffer);
+}
+
+
 //GLOBAL variables (DO NOT TOUCH!) ------------------------------------------
 
 //source/destination ID
@@ -19,10 +53,9 @@ int main(void){
     pc.printf("------------------ protocol stack starts! --------------------------\n");
         //source & destination ID setting
     pc.printf(":: ID for this node : ");
-    pc.scanf("%d", &input_thisId);
+    input_thisId = getID();
     pc.printf(":: ID for the destination : ");
-    pc.scanf("%d", &input_destId);
-    pc.getc();
+    input_destId = getID();
 
     pc.printf("endnode : %i, dest : %i\n", input_thisId, input_destId);
     
