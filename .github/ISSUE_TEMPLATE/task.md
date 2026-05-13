@@ -2,7 +2,7 @@
 name: Task
 about: 구현 작업, 테스트 작업, 수정 작업을 정리합니다.
 title: "[Task] "
-labels: task
+labels: ''
 assignees: ''
 ---
 
@@ -40,26 +40,12 @@ assignees: ''
 - [ ] Judge는 WRONG_ANSWER, TIMEOUT, OUT_OF_TURN을 판정할 수 있어야 한다.
 - [ ] GAMEOVER 이후 노드는 TURN 또는 ANSWER를 전송하지 않는다.
 
-## 테스트 항목
-<!-- 완료 후 확인해야 할 테스트를 적어주세요. 필요 없는 항목은 지워도 됩니다. -->
+
+## 확인 항목
+<!-- 완료 후 확인한 항목에 체크해주세요. 필요 없는 항목은 지워도 됩니다. -->
 - [ ] 컴파일 확인
 - [ ] 시리얼 출력 확인
-- [ ] Judge 1개, Player 1개 보드 테스트
-- [ ] 보드 5개 통합 테스트
-- [ ] 정상 Join Phase 확인
-- [ ] SETUP 이후 RUNNING 진입 확인
-- [ ] TURN / ANSWER 정상 흐름 확인
-- [ ] WRONG_ANSWER 확인
-- [ ] TIMEOUT 확인
-- [ ] OUT_OF_TURN 확인
-- [ ] GAMEOVER 이후 IDLE 복귀 확인
-
-## 로그 / 결과
-<!-- 테스트 로그나 결과를 붙여주세요. -->
-
-```txt
-
-```
+- [ ] 보드 테스트
 
 ## 참고 사항
 <!-- 공유해야 할 내용, 주의할 점, 미정 사항을 적어주세요. -->
