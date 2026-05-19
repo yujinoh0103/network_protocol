@@ -57,6 +57,8 @@ OBJECTS += L3_msg.o
 OBJECTS += L3_FSMevent.o
 OBJECTS += L3_LLinterface.o
 OBJECTS += L3_timer.o
+OBJECTS += test_369engine.o
+OBJECTS += L3_369engine.o
 
  SYS_OBJECTS += lib/Rx_HAL.o
  SYS_OBJECTS += lib/Rx_HHI.o
