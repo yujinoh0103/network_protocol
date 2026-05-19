@@ -2,6 +2,7 @@
 #include "L3_msg.h"
 #include "L3_timer.h"
 #include "L3_LLinterface.h"
+#include "L3_FSMmain_judge.h"
 #include "protocol_parameters.h"
 #include "mbed.h"
 
@@ -23,6 +24,9 @@ static uint8_t sdu[1030];
 //serial port interface
 static Serial pc(USBTX, USBRX);
 static uint8_t myDestId;
+static uint8_t isJudgeNode = 0;
+
+extern uint8_t input_thisId;
 
 //application event handler : generating SDU from keyboard input
 static void L3service_processInputWord(void)
@@ -30,6 +34,15 @@ static void L3service_processInputWord(void)
     char c = pc.getc();
     if (!L3_event_checkEventFlag(L3_event_dataToSend))
     {
+        if (c == 0x7f || c == 0x08) {
+            if (wordLen > 0) {
+                wordLen--;
+            }
+            return;
+        }
+        if ((unsigned char)c < 0x20 && c != '\n' && c != '\r') {
+            return;
+        }
         if (c == '\n' || c == '\r')
         {
             originalWord[wordLen++] = '\0';
@@ -55,6 +68,12 @@ void L3_initFSM(uint8_t destId)
 {
 
     myDestId = destId;
+    isJudgeNode = (input_thisId == L3_JUDGE_NODE_ID);
+    if (isJudgeNode) {
+        L3_judge_initIDLE();
+        return;
+    }
+
     //initialize service layer
     pc.attach(&L3service_processInputWord, Serial::RxIrq);
 
@@ -67,6 +86,13 @@ void L3_FSMrun(void)
     {
         debug_if(DBGMSG_L3, "[L3] State transition from %i to %i\n", prev_state, main_state);
         prev_state = main_state;
+    }
+
+    if (isJudgeNode) {
+        if (L3_judge_getCurrentState() == L3_JUDGE_STATE_IDLE) {
+            L3_judge_handleIDLE();
+        }
+        return;
     }
 
     //FSM should be implemented here! ---->>>>
@@ -92,7 +118,10 @@ void L3_FSMrun(void)
                 //msg header setting
                 strcpy((char*)sdu, (char*)originalWord);
                 debug("[L3] msg length : %i\n", wordLen);
-                L3_LLI_dataReqFunc(sdu, wordLen, myDestId);
+                if (wordLen > 0) {
+                    uint8_t sendLen = (uint8_t)(wordLen - 1);
+                    L3_LLI_dataReqFunc(sdu, sendLen, myDestId);
+                }
 
                 debug_if(DBGMSG_L3, "[L3] sending msg....\n");
                 wordLen = 0;

@@ -87,12 +87,12 @@ L3ElimReason L3_string_to_elim_reason(const char* reason_str);
 // Wire serialization for the L3Message data model 
 
 // Serialize an L3Message into buffer
-uint8_t L3_msg_serialize(const L3Message* msg, uint8_t* buffer, uint8_t bufSize);
+uint8_t L3_msg_serialize(const L3Message* msg, uint8_t* buffer, size_t bufSize);
 
 // Deserialize 
-int L3_msg_deserialize(const uint8_t* buffer, uint8_t size, L3Message* msg);
+int L3_msg_deserialize(const uint8_t* buffer, size_t size, L3Message* msg);
 
 // Peek at the message type without fully deserializing the body.
-L3MsgType L3_msg_peekType(const uint8_t* buffer, uint8_t size);
+L3MsgType L3_msg_peekType(const uint8_t* buffer, size_t size);
 
 #endif

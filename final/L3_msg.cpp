@@ -109,7 +109,7 @@ static int safe_copy_field(char* dst, size_t dstCap, const char* src, size_t src
     return 1;
 }
 
-uint8_t L3_msg_serialize(const L3Message* msg, uint8_t* buffer, uint8_t bufSize)
+uint8_t L3_msg_serialize(const L3Message* msg, uint8_t* buffer, size_t bufSize)
 {
     if (msg == NULL || buffer == NULL || bufSize == 0) {
         return 0;
@@ -161,7 +161,7 @@ uint8_t L3_msg_serialize(const L3Message* msg, uint8_t* buffer, uint8_t bufSize)
     return (uint8_t)written;
 }
 
-L3MsgType L3_msg_peekType(const uint8_t* buffer, uint8_t size)
+L3MsgType L3_msg_peekType(const uint8_t* buffer, size_t size)
 {
     if (buffer == NULL || size == 0) {
         return L3_MSG_UNKNOWN;
@@ -178,7 +178,7 @@ L3MsgType L3_msg_peekType(const uint8_t* buffer, uint8_t size)
     return L3_string_to_msg_type(head);
 }
 
-int L3_msg_deserialize(const uint8_t* buffer, uint8_t size, L3Message* msg)
+int L3_msg_deserialize(const uint8_t* buffer, size_t size, L3Message* msg)
 {
     if (buffer == NULL || size == 0 || msg == NULL) {
         return 0;
