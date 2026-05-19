@@ -12,7 +12,7 @@ static uint8_t timerStatus = 0;
 void L3_timer_timeoutHandler(void) 
 {
     timerStatus = 0;
-    //L3_event_setEventFlag(L3_event_arqTimeout);
+    L3_event_setEventFlag(L3_event_arqTimeout); //주석해제
 }
 
 //timer related functions ---------------------------

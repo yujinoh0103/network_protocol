@@ -242,7 +242,7 @@ static void statePlaying(void)
 }
 
 // -------------------------------------------------------
-// Send JOIN (dst=0 유니캐스트) [R-JOIN-01]
+// Send JOIN (broadcast) [R-JOIN-01]
 // -------------------------------------------------------
 static void sendJoin(void)
 {
@@ -255,7 +255,7 @@ static void sendJoin(void)
     uint8_t len = L3_msg_serialize(&msg, buf, sizeof(buf));
     if (len == 0) return;
 
-    L3_LLI_dataReqFunc(buf, len, L3_JUDGE_NODE_ID);
+    L3_LLI_dataReqFunc(buf, len, L3_BROADCAST_ID);
     pc.printf("[Player] JOIN sent. nickname=%s\n", myNickname);
 }
 

@@ -111,7 +111,7 @@ const char* L3_369engine_computeExpectedAnswer(uint32_t number, char* outValue, 
     }
     uint8_t count = count369Digits(number);
     if (count == 0) {
-        int written = snprintf(outValue, outValueLen, "%u", number);
+        int written = snprintf(outValue, outValueLen, "%lu", (unsigned long)number);
         if (written < 0 || (uint8_t)written >= outValueLen) {
             outValue[0] = '\0';
         }

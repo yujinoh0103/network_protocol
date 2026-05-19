@@ -244,7 +244,7 @@ static void statePlaying(void)
 }
 
 // -------------------------------------------------------
-// Send JOIN (dst=0 유니캐스트) [R-JOIN-01]
+// Send JOIN (broadcast) [R-JOIN-01]
 // C팀 인코딩 함수 오면 교체
 // -------------------------------------------------------
 static void sendJoin(void)
@@ -254,7 +254,7 @@ static void sendJoin(void)
         "{\"type\":\"JOIN\",\"node_nickname\":\"%s\"}",
         myNickname
     );
-    L3_LLI_dataReqFunc((uint8_t*)buf, strlen(buf) + 1, 0);
+    L3_LLI_dataReqFunc((uint8_t*)buf, strlen(buf) + 1, L3_BROADCAST_ID);
     pc.printf("[Player] JOIN sent. nickname=%s\n", myNickname);
 }
 
@@ -272,7 +272,7 @@ static void sendAnswer(void)
         "{\"type\":\"ANSWER\",\"player_nickname\":\"%s\",\"value\":\"%s\"}",
         myNickname, answer
     );
-    L3_LLI_dataReqFunc((uint8_t*)buf, strlen(buf) + 1, 0xFF);
+    L3_LLI_dataReqFunc((uint8_t*)buf, strlen(buf) + 1, L3_BROADCAST_ID);
     pc.printf("[Player] ANSWER sent. value=%s\n", answer);
 }
 
