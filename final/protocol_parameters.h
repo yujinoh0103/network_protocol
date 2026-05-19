@@ -2,7 +2,6 @@
 #define DBGMSG_L3                       0 //debug print control
 
 #define L3_MAXDATASIZE                  1024
-#define L3_BROADCAST_ID                 255
 
 
 #define L2_ARQ_MAXRETRANSMISSION        10
