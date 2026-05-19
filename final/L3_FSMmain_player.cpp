@@ -15,12 +15,45 @@ extern Serial pc;
 // -------------------------------------------------------
 static PlayerState playerState = PLAYER_STATE_IDLE;
 static char myNickname[L3_MAX_NICKNAME_LEN];
-static char judgeNickname[L3_MAX_NICKNAME_LEN];
 static uint8_t isJudgeKnown = 0;
 
 // WAIT_ACK 재전송 관련
 static uint8_t waitAckRetryPending = 0;
+static uint8_t joinRetryCount = 0;
 static Timeout retryTimer;
+
+// 키보드 입력 관련 변수
+static char inputBuffer[L3_MAX_VALUE_LEN];
+static uint8_t inputLen = 0;
+static uint8_t inputReady = 0;
+
+// -------------------------------------------------------
+// 키보드 인터럽트 처리 (사용자 입력)
+// -------------------------------------------------------
+static void L3service_processInputWord(void)
+{
+    char c = pc.getc();
+    if (!inputReady)
+    {
+        if (c == '\r\n' || c == '\r')
+        {
+            inputBuffer[inputLen] = '\0';
+            inputReady = 1;
+            pc.printf("\r\n[Player] Typed: %s\r\n", inputBuffer);
+        }
+        else
+        {
+            inputBuffer[inputLen++] = c;
+            pc.putc(c); // 터미널 에코
+            if (inputLen >= L3_MAX_VALUE_LEN - 1)
+            {
+                inputBuffer[inputLen] = '\0';
+                inputReady = 1;
+                pc.printf("\r\n[Player] Max reached! Typed: %s\r\n", inputBuffer);
+            }
+        }
+    }
+}
 
 // -------------------------------------------------------
 // Forward declarations
@@ -30,36 +63,8 @@ static void stateWaitAck(void);
 static void stateJoining(void);
 static void statePlaying(void);
 static void sendJoin(void);
-static void sendAnswer(void);
+static void sendAnswer(const char* answer);
 static void retryJoinCallback(void);
-
-// -------------------------------------------------------
-// 수신 메시지 type 파싱 헬퍼
-// C팀 디코딩 함수 오면 교체 예정
-// -------------------------------------------------------
-static int parseReceivedMsg(L3Message* outMsg)
-{
-    uint8_t* dataPtr = L3_LLI_getMsgPtr();
-    uint8_t size = L3_LLI_getSize();
-
-    if (dataPtr == NULL || size == 0) {
-        return 0;
-    }
-
-    char* typeStart = strstr((char*)dataPtr, "\"type\":\"");
-    if (typeStart == NULL) return 0;
-
-    typeStart += 8;
-    char typeStr[16] = {0};
-    int i = 0;
-    while (typeStart[i] != '"' && typeStart[i] != '\0' && i < 15) {
-        typeStr[i] = typeStart[i];
-        i++;
-    }
-    outMsg->type = L3_string_to_msg_type(typeStr);
-
-    return 1;
-}
 
 // -------------------------------------------------------
 // Init
@@ -74,8 +79,14 @@ void L3_player_initFSM(const char* nickname)
     playerState = PLAYER_STATE_IDLE;
     isJudgeKnown = 0;
     waitAckRetryPending = 0;
+    joinRetryCount = 0;
 
-    pc.printf("[Player] FSM init. nickname=%s\n", myNickname);
+    // 입력 버퍼 초기화 및 인터럽트 연결
+    inputLen = 0;
+    inputReady = 0;
+    pc.attach(&L3service_processInputWord, Serial::RxIrq);
+
+    pc.printf("[Player] FSM init. nickname=%s\r\n", myNickname);
 }
 
 // -------------------------------------------------------
@@ -98,7 +109,7 @@ void L3_player_runFSM(void)
 // -------------------------------------------------------
 static void stateIdle(void)
 {
-    pc.printf("[Player] IDLE: sending JOIN\n");
+    pc.printf("[Player] IDLE: sending JOIN\r\n");
     sendJoin();
     L3_timer_startTimer();
     playerState = PLAYER_STATE_WAIT_ACK;
@@ -118,28 +129,45 @@ static void stateWaitAck(void)
     if (L3_event_checkEventFlag(L3_event_msgRcvd)) {
         L3_event_clearEventFlag(L3_event_msgRcvd);
 
-        L3Message msg;
-        if (!parseReceivedMsg(&msg)) return;
+        uint8_t* dataPtr = L3_LLI_getMsgPtr();
+        uint8_t size = L3_LLI_getSize();
 
-        if (msg.type == L3_MSG_JOIN_ACK) {
-            // [R-JOIN-11] 첫 JOIN_ACK 송신자를 Judge로 인지
-            if (!isJudgeKnown) {
-                isJudgeKnown = 1;
-                pc.printf("[Player] Judge identified. srcId=%d\n", L3_LLI_getSrcId());
-            }
-
-            L3_timer_stopTimer();
-            pc.printf("[Player] JOIN_ACK received -> JOINING\n");
-            playerState = PLAYER_STATE_JOINING;
+        // type만 빠르게 확인
+        if (L3_msg_peekType(dataPtr, size) != L3_MSG_JOIN_ACK) {
             return;
         }
+
+        // 역직렬화
+        L3Message msg;
+        if (!L3_msg_deserialize(dataPtr, size, &msg)) {
+            return;
+        }
+
+        // [R-JOIN-11] 첫 JOIN_ACK 송신자를 Judge로 인지
+        if (!isJudgeKnown) {
+            isJudgeKnown = 1;
+            pc.printf("[Player] Judge identified. srcId=%d\r\n", L3_LLI_getSrcId());
+        }
+
+        L3_timer_stopTimer();
+        pc.printf("[Player] JOIN_ACK received. count=%d -> JOINING\r\n",
+            msg.body.join_ack.registered_count);
+        playerState = PLAYER_STATE_JOINING;
+        return;
     }
 
-    // WAIT_ACK 타임아웃 [R-JOIN-08]
+    // WAIT_ACK 타임아웃 [R-JOIN-08] (최대 3회 재시도)
     if (L3_event_checkEventFlag(L3_event_arqTimeout)) {
         L3_event_clearEventFlag(L3_event_arqTimeout);
 
-        pc.printf("[Player] WAIT_ACK timeout. waiting 3s...\n");
+        joinRetryCount++;
+        if (joinRetryCount >= 3) {
+            pc.printf("[Player] WAIT_ACK timeout 3 times. Giving up. Please reset the board.\r\n");
+            // 더 이상 타이머를 예약하지 않으므로 무한 대기(정지) 상태가 됩니다.
+            return;
+        }
+
+        pc.printf("[Player] WAIT_ACK timeout. waiting 3s... (retry %d/3)\r\n", joinRetryCount);
         waitAckRetryPending = 1;
         retryTimer.attach(retryJoinCallback, 3.0f);
     }
@@ -148,7 +176,7 @@ static void stateWaitAck(void)
 static void retryJoinCallback(void)
 {
     waitAckRetryPending = 0;
-    pc.printf("[Player] retrying JOIN...\n");
+    pc.printf("[Player] retrying JOIN...\r\n");
     playerState = PLAYER_STATE_IDLE;
 }
 
@@ -164,24 +192,46 @@ static void stateJoining(void)
     }
     L3_event_clearEventFlag(L3_event_msgRcvd);
 
-    L3Message msg;
-    if (!parseReceivedMsg(&msg)) return;
+    uint8_t* dataPtr = L3_LLI_getMsgPtr();
+    uint8_t size = L3_LLI_getSize();
 
-    if (msg.type == L3_MSG_SETUP) {
-        // C팀 디코딩 함수 오면 player_order 파싱 후 setPlayerOrder 호출
-        L3_369engine_reset();
-        L3_369engine_init(myNickname);
-
-        pc.printf("[Player] SETUP received -> PLAYING\n");
-        playerState = PLAYER_STATE_PLAYING;
-        return;
-    }
+    L3MsgType type = L3_msg_peekType(dataPtr, size);
 
     // [R-SETUP-06] SETUP 전 TURN 무시
-    if (msg.type == L3_MSG_TURN) {
-        pc.printf("[Player] JOINING: ignoring TURN before SETUP\n");
+    if (type == L3_MSG_TURN) {
+        pc.printf("[Player] JOINING: ignoring TURN before SETUP\r\n");
         return;
     }
+
+    if (type != L3_MSG_SETUP) {
+        return;
+    }
+
+    L3Message msg;
+    if (!L3_msg_deserialize(dataPtr, size, &msg)) {
+        return;
+    }
+
+    // [R-SETUP-03] 내부 숫자 초기화
+    L3_369engine_reset();
+    L3_369engine_init(myNickname);
+
+    // [R-SETUP-04] player_order 확정
+    L3_369engine_setPlayerOrder(
+        (const char (*)[L3_MAX_NICKNAME_LEN])msg.body.setup.player_order,
+        L3_MAX_PLAYERS
+    );
+
+    pc.printf("[Player] SETUP received. judge=%s -> PLAYING\r\n",
+        msg.body.setup.judge_nickname);
+    pc.printf("[Player] order: %s %s %s %s\r\n",
+        msg.body.setup.player_order[0],
+        msg.body.setup.player_order[1],
+        msg.body.setup.player_order[2],
+        msg.body.setup.player_order[3]
+    );
+
+    playerState = PLAYER_STATE_PLAYING;
 }
 
 // -------------------------------------------------------
@@ -190,52 +240,56 @@ static void stateJoining(void)
 // -------------------------------------------------------
 static void statePlaying(void)
 {
+    // 내 차례이고, 키보드 입력이 완료되었을 때 전송
+    if (L3_369engine_isMyTurnNow() && inputReady) {
+        sendAnswer(inputBuffer);
+        inputReady = 0; // 초기화
+        inputLen = 0;
+    }
+
     if (!L3_event_checkEventFlag(L3_event_msgRcvd)) {
         return;
     }
     L3_event_clearEventFlag(L3_event_msgRcvd);
 
-    L3Message msg;
-    if (!parseReceivedMsg(&msg)) return;
+    uint8_t* dataPtr = L3_LLI_getMsgPtr();
+    uint8_t size = L3_LLI_getSize();
 
-    if (msg.type == L3_MSG_TURN) {
-        // player_nickname 파싱
-        // C팀 디코딩 함수 오면 교체
-        uint8_t* dataPtr = L3_LLI_getMsgPtr();
-        char* nickStart = strstr((char*)dataPtr, "\"player_nickname\":\"");
-        char turnNickname[L3_MAX_NICKNAME_LEN] = {0};
+    L3MsgType type = L3_msg_peekType(dataPtr, size);
 
-        if (nickStart != NULL) {
-            nickStart += 19;
-            int i = 0;
-            while (nickStart[i] != '"' && nickStart[i] != '\0' && i < L3_MAX_NICKNAME_LEN - 1) {
-                turnNickname[i] = nickStart[i];
-                i++;
-            }
-        }
+    if (type == L3_MSG_TURN) {
+        L3Message msg;
+        if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
 
-        L3TurnMsg turnMsg;
-        strncpy(turnMsg.player_nickname, turnNickname, L3_MAX_NICKNAME_LEN - 1);
-        turnMsg.player_nickname[L3_MAX_NICKNAME_LEN - 1] = '\0';
-        L3_369engine_onTurnReceived(&turnMsg);
+        // 369 엔진에 TURN 전달
+        L3_369engine_onTurnReceived(&msg.body.turn);
 
-        pc.printf("[Player] TURN. player=%s currentNumber=%lu\n",
-            turnNickname,
+        pc.printf("[Player] TURN. player=%s currentNumber=%lu\r\n",
+            msg.body.turn.player_nickname,
             (unsigned long)L3_369engine_getCurrentNumber()
         );
 
-        // [R-TURN-04] 내 차례면 ANSWER 전송
+        // [R-TURN-04] 내 차례면 입력 대기
         if (L3_369engine_isMyTurnNow()) {
-            sendAnswer();
+            inputLen = 0;
+            inputReady = 0;
+            pc.printf("[Player] *** MY TURN! *** Type your answer and press Enter: ");
         } else {
-            pc.printf("[Player] Not my turn. waiting...\n");
+            pc.printf("[Player] Not my turn. waiting...\r\n");
         }
         return;
     }
 
     // [R-GAMEOVER-04] GAMEOVER 수신 → IDLE
-    if (msg.type == L3_MSG_GAMEOVER) {
-        pc.printf("[Player] GAMEOVER received -> IDLE\n");
+    if (type == L3_MSG_GAMEOVER) {
+        L3Message msg;
+        if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
+
+        pc.printf("[Player] GAMEOVER. eliminated=%s reason=%s -> IDLE\r\n",
+            msg.body.gameover.eliminated_player_nickname,
+            L3_elim_reason_to_string(msg.body.gameover.reason)
+        );
+
         L3_369engine_reset();
         isJudgeKnown = 0;
         playerState = PLAYER_STATE_IDLE;
@@ -244,36 +298,40 @@ static void statePlaying(void)
 }
 
 // -------------------------------------------------------
-// Send JOIN (broadcast) [R-JOIN-01]
-// C팀 인코딩 함수 오면 교체
+// Send JOIN (dst=0 유니캐스트) [R-JOIN-01]
 // -------------------------------------------------------
 static void sendJoin(void)
 {
-    char buf[64];
-    snprintf(buf, sizeof(buf),
-        "{\"type\":\"JOIN\",\"node_nickname\":\"%s\"}",
-        myNickname
-    );
-    L3_LLI_dataReqFunc((uint8_t*)buf, strlen(buf) + 1, L3_BROADCAST_ID);
-    pc.printf("[Player] JOIN sent. nickname=%s\n", myNickname);
+    L3Message msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.type = L3_MSG_JOIN;
+    strncpy(msg.body.join.node_nickname, myNickname, L3_MAX_NICKNAME_LEN - 1);
+
+    uint8_t buf[L3_MSG_MAX_SERIAL_LEN];
+    uint8_t len = L3_msg_serialize(&msg, buf, sizeof(buf));
+    if (len == 0) return;
+
+    L3_LLI_dataReqFunc(buf, len, L3_JUDGE_NODE_ID);
+    pc.printf("[Player] JOIN sent. nickname=%s\r\n", myNickname);
 }
 
 // -------------------------------------------------------
 // Send ANSWER (브로드캐스트)
-// C팀 인코딩 함수 오면 교체
 // -------------------------------------------------------
-static void sendAnswer(void)
+static void sendAnswer(const char* answer)
 {
-    char answer[L3_MAX_VALUE_LEN];
-    L3_369engine_computeExpectedAnswerForCurrentTurn(answer, sizeof(answer));
+    L3Message msg;
+    memset(&msg, 0, sizeof(msg));
+    msg.type = L3_MSG_ANSWER;
+    strncpy(msg.body.answer.player_nickname, myNickname, L3_MAX_NICKNAME_LEN - 1);
+    strncpy(msg.body.answer.value, answer, L3_MAX_VALUE_LEN - 1);
 
-    char buf[80];
-    snprintf(buf, sizeof(buf),
-        "{\"type\":\"ANSWER\",\"player_nickname\":\"%s\",\"value\":\"%s\"}",
-        myNickname, answer
-    );
-    L3_LLI_dataReqFunc((uint8_t*)buf, strlen(buf) + 1, L3_BROADCAST_ID);
-    pc.printf("[Player] ANSWER sent. value=%s\n", answer);
+    uint8_t buf[L3_MSG_MAX_SERIAL_LEN];
+    uint8_t len = L3_msg_serialize(&msg, buf, sizeof(buf));
+    if (len == 0) return;
+
+    L3_LLI_dataReqFunc(buf, len, L3_BROADCAST_ID);
+    pc.printf("[Player] ANSWER sent. value=%s\r\n", answer);
 }
 
 // -------------------------------------------------------
