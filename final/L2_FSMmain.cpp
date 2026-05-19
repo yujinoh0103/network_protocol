@@ -56,8 +56,9 @@ static uint8_t L2_validityCheck_ID(void)
 
 uint8_t L2_configDestId(uint8_t destId)
 {
-    if (L2_validityCheck_ID() == 1)
+    if (myL2ID == destId)
     {
+        debug("[WARNING] myID and destination ID is the same! my:%i, dest:%i\n", myL2ID, destId);
         debug("[L2] Failed to config dest to ID %i\n", destId);
         return 1;
     }

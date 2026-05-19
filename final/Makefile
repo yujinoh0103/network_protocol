@@ -54,6 +54,7 @@ OBJECTS += L2_LLinterface.o
 OBJECTS += L2_timer.o
 OBJECTS += L3_FSMmain.o
 OBJECTS += L3_FSMmain_player.o
+OBJECTS += L3_FSMmain_judge.o
 OBJECTS += L3_msg.o
 OBJECTS += L3_FSMevent.o
 OBJECTS += L3_LLinterface.o
