@@ -4,7 +4,7 @@
 #include "L3_msg.h"
 #include "L3_FSMevent.h"
 #include "L3_LLinterface.h"
-#include "L3_timer.h"
+#include "L3_FSMmain_judge.h"
 #include "protocol_parameters.h"
 #include <string.h>
 
@@ -63,17 +63,12 @@ void L3_player_runFSM(void)
     }
 }
 
-// -------------------------------------------------------
-// State: IDLE
-// 탈출: JOIN 전송 → WAIT_ACK
-// -------------------------------------------------------
-static void stateIdle(void)
-{
-    pc.printf("[Player] IDLE: sending JOIN\n");
-    sendJoin();
-    L3_timer_startTimer();
-    playerState = PLAYER_STATE_WAIT_ACK;
-}
+//serial port interface
+static Serial pc(USBTX, USBRX);
+static uint8_t myDestId;
+static uint8_t isJudgeNode = 0;
+
+extern uint8_t input_thisId;
 
 // -------------------------------------------------------
 // State: WAIT_ACK
@@ -82,19 +77,23 @@ static void stateIdle(void)
 // -------------------------------------------------------
 static void stateWaitAck(void)
 {
-    if (waitAckRetryPending) {
-        return;
-    }
-
-    if (L3_event_checkEventFlag(L3_event_msgRcvd)) {
-        L3_event_clearEventFlag(L3_event_msgRcvd);
-
-        uint8_t* dataPtr = L3_LLI_getMsgPtr();
-        uint8_t size = L3_LLI_getSize();
-
-        // type만 빠르게 확인
-        if (L3_msg_peekType(dataPtr, size) != L3_MSG_JOIN_ACK) {
+    char c = pc.getc();
+    if (!L3_event_checkEventFlag(L3_event_dataToSend))
+    {
+        if (c == 0x7f || c == 0x08) {
+            if (wordLen > 0) {
+                wordLen--;
+            }
             return;
+        }
+        if ((unsigned char)c < 0x20 && c != '\n' && c != '\r') {
+            return;
+        }
+        if (c == '\n' || c == '\r')
+        {
+            originalWord[wordLen++] = '\0';
+            L3_event_setEventFlag(L3_event_dataToSend);
+            debug_if(DBGMSG_L3,"word is ready! ::: %s\n", originalWord);
         }
 
         // 역직렬화
@@ -148,17 +147,15 @@ static void stateJoining(void)
     uint8_t* dataPtr = L3_LLI_getMsgPtr();
     uint8_t size = L3_LLI_getSize();
 
-    L3MsgType type = L3_msg_peekType(dataPtr, size);
-
-    // [R-SETUP-06] SETUP 전 TURN 무시
-    if (type == L3_MSG_TURN) {
-        pc.printf("[Player] JOINING: ignoring TURN before SETUP\n");
+    myDestId = destId;
+    isJudgeNode = (input_thisId == L3_JUDGE_NODE_ID);
+    if (isJudgeNode) {
+        L3_judge_initIDLE();
         return;
     }
 
-    if (type != L3_MSG_SETUP) {
-        return;
-    }
+    //initialize service layer
+    pc.attach(&L3service_processInputWord, Serial::RxIrq);
 
     L3Message msg;
     if (!L3_msg_deserialize(dataPtr, size, &msg)) {
@@ -224,20 +221,52 @@ static void statePlaying(void)
         return;
     }
 
-    // [R-GAMEOVER-04] GAMEOVER 수신 → IDLE
-    if (type == L3_MSG_GAMEOVER) {
-        L3Message msg;
-        if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
-
-        pc.printf("[Player] GAMEOVER. eliminated=%s reason=%s -> IDLE\n",
-            msg.body.gameover.eliminated_player_nickname,
-            L3_elim_reason_to_string(msg.body.gameover.reason)
-        );
-
-        L3_369engine_reset();
-        isJudgeKnown = 0;
-        playerState = PLAYER_STATE_IDLE;
+    if (isJudgeNode) {
+        if (L3_judge_getCurrentState() == L3_JUDGE_STATE_IDLE) {
+            L3_judge_handleIDLE();
+        }
         return;
+    }
+
+    //FSM should be implemented here! ---->>>>
+    switch (main_state)
+    {
+        case L3STATE_IDLE: //IDLE state description
+            
+            if (L3_event_checkEventFlag(L3_event_msgRcvd)) //if data reception event happens
+            {
+                //Retrieving data info.
+                uint8_t* dataPtr = L3_LLI_getMsgPtr();
+                uint8_t size = L3_LLI_getSize();
+
+                debug("\n -------------------------------------------------\nRCVD MSG : %s (length:%i)\n -------------------------------------------------\n", 
+                            dataPtr, size);
+                
+                pc.printf("Give a word to send : ");
+                
+                L3_event_clearEventFlag(L3_event_msgRcvd);
+            }
+            else if (L3_event_checkEventFlag(L3_event_dataToSend)) //if data needs to be sent (keyboard input)
+            {
+                //msg header setting
+                strcpy((char*)sdu, (char*)originalWord);
+                debug("[L3] msg length : %i\n", wordLen);
+                if (wordLen > 0) {
+                    uint8_t sendLen = (uint8_t)(wordLen - 1);
+                    L3_LLI_dataReqFunc(sdu, sendLen, myDestId);
+                }
+
+                debug_if(DBGMSG_L3, "[L3] sending msg....\n");
+                wordLen = 0;
+
+                pc.printf("Give a word to send : ");
+
+                L3_event_clearEventFlag(L3_event_dataToSend);
+            }
+            break;
+
+        default :
+            break;
     }
 }
 
