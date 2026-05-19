@@ -63,7 +63,7 @@ void L2_LLI_dataIndFunc(uint8_t srcId, uint8_t* dataPtr, uint8_t size, uint8_t B
 void L2_LLI_initLowLayer(uint8_t srcId)
 {
     srand(time(NULL));
-    phymac_init(srcId, L1_FREQCHANNEL, L2_LLI_dataCnfFunc, L2_LLI_dataIndFunc);
+    phymac_init(srcId, L2_LLI_dataCnfFunc, L2_LLI_dataIndFunc);
 }
 
 
