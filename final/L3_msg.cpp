@@ -109,6 +109,20 @@ static int safe_copy_field(char* dst, size_t dstCap, const char* src, size_t src
     return 1;
 }
 
+// 연속된 구분자를 건너뛰지 않는(빈 문자열도 반환하는) 자체 분리 함수
+static char* split_next(char** str_ptr, char delimiter) {
+    if (str_ptr == NULL || *str_ptr == NULL) return NULL;
+    char* start = *str_ptr;
+    char* end = strchr(start, delimiter);
+    if (end != NULL) {
+        *end = '\0';
+        *str_ptr = end + 1;
+    } else {
+        *str_ptr = NULL;
+    }
+    return start;
+}
+
 uint8_t L3_msg_serialize(const L3Message* msg, uint8_t* buffer, size_t bufSize)
 {
     if (msg == NULL || buffer == NULL || bufSize == 0) {
@@ -193,8 +207,8 @@ int L3_msg_deserialize(const uint8_t* buffer, size_t size, L3Message* msg)
 
     memset(msg, 0, sizeof(*msg));
 
-    char* save = NULL;
-    char* tok = strtok_r(tmp, ":", &save);
+    char* save = tmp;
+    char* tok = split_next(&save, ':');
     if (tok == NULL) {
         msg->type = L3_MSG_UNKNOWN;
         return 0;
@@ -204,64 +218,65 @@ int L3_msg_deserialize(const uint8_t* buffer, size_t size, L3Message* msg)
 
     switch (msg->type) {
         case L3_MSG_JOIN: {
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             return safe_copy_field(msg->body.join.node_nickname,
                                    L3_MAX_NICKNAME_LEN, tok, strlen(tok));
         }
         case L3_MSG_JOIN_ACK: {
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             safe_copy_field(msg->body.join_ack.node_nickname,
                             L3_MAX_NICKNAME_LEN, tok, strlen(tok));
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             msg->body.join_ack.registered_count = (uint8_t)atoi(tok);
             return 1;
         }
         case L3_MSG_SETUP: {
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             safe_copy_field(msg->body.setup.judge_nickname,
                             L3_MAX_NICKNAME_LEN, tok, strlen(tok));
             for (int i = 0; i < L3_MAX_PLAYERS; i++) {
-                tok = strtok_r(NULL, ":", &save);
+                tok = split_next(&save, ':');
                 if (tok == NULL) return 0;
                 safe_copy_field(msg->body.setup.player_order[i],
                                 L3_MAX_NICKNAME_LEN, tok, strlen(tok));
             }
  
-            tok = strtok_r(NULL, "", &save);
+            // 마지막 요소(notice)는 구분자가 없을 수 있으므로 남은 전체 문자열 복사
+            tok = save; // 나머지가 notice
             if (tok == NULL) return 0;
             return safe_copy_field(msg->body.setup.notice,
                                    L3_MAX_NOTICE_LEN, tok, strlen(tok));
         }
         case L3_MSG_TURN: {
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             safe_copy_field(msg->body.turn.player_nickname,
                             L3_MAX_NICKNAME_LEN, tok, strlen(tok));
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             msg->body.turn.timeout_sec = (uint8_t)atoi(tok);
             return 1;
         }
         case L3_MSG_ANSWER: {
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             safe_copy_field(msg->body.answer.player_nickname,
                             L3_MAX_NICKNAME_LEN, tok, strlen(tok));
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             return safe_copy_field(msg->body.answer.value,
                                    L3_MAX_VALUE_LEN, tok, strlen(tok));
         }
         case L3_MSG_GAMEOVER: {
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             safe_copy_field(msg->body.gameover.eliminated_player_nickname,
                             L3_MAX_NICKNAME_LEN, tok, strlen(tok));
-            tok = strtok_r(NULL, ":", &save);
+            tok = split_next(&save, ':');
             if (tok == NULL) return 0;
             msg->body.gameover.reason = L3_string_to_elim_reason(tok);
             return 1;

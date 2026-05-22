@@ -20,7 +20,6 @@ static uint8_t prev_state = main_state;
 static uint8_t originalWord[1030];
 static uint8_t wordLen=0;
 
-static uint8_t sdu[1030];
 
 //serial port interface
 static Serial pc(USBTX, USBRX);
@@ -92,6 +91,8 @@ void L3_FSMrun(void)
     if (isJudgeNode) {
         if (L3_judge_getCurrentState() == L3_JUDGE_STATE_IDLE) {
             L3_judge_handleIDLE();
+        } else if (L3_judge_getCurrentState() == L3_JUDGE_STATE_RUNNING) {
+            L3_judge_handleRUNNING();
         }
         return;
     }

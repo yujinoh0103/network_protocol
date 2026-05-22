@@ -196,11 +196,11 @@ void L2_FSMrun(void)
 
                 //L3_LLI_dataInd(L2_msg_getWord(dataPtr), srcId, size-L2_MSG_OFFSET_DATA, L2_LLI_getSnr(), L2_LLI_getRssi());
 #ifndef DISABLE_ARQ                
-                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr))
-                    debug("[L3][WARNING] Invalid PDU SN (%i) while (%i) is required! discarding it...\n", L2_msg_getSeq(dataPtr), seqNum);
-                else
+                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr)) {
+                    debug("[L3][WARNING] Invalid PDU SN (%i) while (%i) is required! (Ignoring SN check for multi-node)\n", L2_msg_getSeq(dataPtr), seqNum);
+                }
 #endif
-                    L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);
+                L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);
 
 
 #ifdef DISABLE_ARQ
@@ -368,11 +368,11 @@ void L2_FSMrun(void)
 
                 //L3_LLI_dataInd(L2_msg_getWord(dataPtr), srcId, size-L2_MSG_OFFSET_DATA, L2_LLI_getSnr(), L2_LLI_getRssi());
 #ifndef DISABLE_ARQ                
-                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr))
-                    debug("[L3][WARNING] Invalid PDU SN (%i) while (%i) is required! discarding it...\n", L2_msg_getSeq(dataPtr), seqNum);
-                else
+                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr)) {
+                    debug("[L3][WARNING] Invalid PDU SN (%i) while (%i) is required! (Ignoring SN check for multi-node)\n", L2_msg_getSeq(dataPtr), seqNum);
+                }
 #endif
-                    L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);            
+                L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);
 
 #ifdef DISABLE_ARQ
                 main_state = L2STATE_IDLE;
