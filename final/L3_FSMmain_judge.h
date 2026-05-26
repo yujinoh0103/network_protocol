@@ -8,7 +8,7 @@
 #define L3_JUDGE_STATE_IDLE             0
 #define L3_JUDGE_STATE_RUNNING          1
 
-#define L3_JUDGE_MAX_PARTICIPANTS       1
+#define L3_JUDGE_MAX_PARTICIPANTS       4
 #define L3_JUDGE_NICKNAME               L3_JUDGE_NICKNAME_STR
 #define L3_JUDGE_FIRST_TURN_TIMEOUT_SEC 30
 
