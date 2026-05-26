@@ -194,7 +194,13 @@ void L2_FSMrun(void)
                 uint8_t brflag = L2_LLI_getIsBroadcasted();
                 uint8_t flag_end = L2_msg_checkIfEndData(dataPtr);
 
-                //L3_LLI_dataInd(L2_msg_getWord(dataPtr), srcId, size-L2_MSG_OFFSET_DATA, L2_LLI_getSnr(), L2_LLI_getRssi())
+                //L3_LLI_dataInd(L2_msg_getWord(dataPtr), srcId, size-L2_MSG_OFFSET_DATA, L2_LLI_getSnr(), L2_LLI_getRssi());
+#ifndef DISABLE_ARQ                
+                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr)) {
+                    debug("[L3][WARNING] Invalid PDU SN (%i) while (%i) is required! (Ignoring SN check for multi-node)\n", L2_msg_getSeq(dataPtr), seqNum);
+                }
+#endif
+                L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);
 
 
 #ifdef DISABLE_ARQ
@@ -223,6 +229,25 @@ void L2_FSMrun(void)
                 pduSize = L2_msg_encodeData(arqPdu, sduIn, seqNum, sduLen, L2_event_checkEventFlag(L2_event_dataToSendBuffer) == 0);
                 L2_LLI_sendData(arqPdu, pduSize, destL2ID);
 
+#ifndef DISABLE_ARQ
+                //Setting ARQ parameter 
+                if (destL2ID != L2_BROADCAST_ID)
+                    seqNum = (seqNum + 1)%L2_MSSG_MAX_SEQNUM;
+                retxCnt = 0;
+#endif
+                debug_if(DBGMSG_L2, "[L2] sending to %i (seq:%i)\n", destL2ID, (seqNum-1)%L2_MSSG_MAX_SEQNUM);
+
+                main_state = L2STATE_TX;
+
+                L2_event_clearEventFlag(L2_event_dataToSend);
+            }
+            else if (L2_event_checkEventFlag(L2_event_dataToSendBuffer))
+            {
+                L2_event_setEventFlag(L2_event_dataToSend);
+
+                if (L2_pullSduBuffer(L2_MSG_MAXDATASIZE) == 0)
+                    L2_event_clearEventFlag(L2_event_dataToSendBuffer);
+            }
 #ifndef DISABLE_ARQ
             //ignore events (arqEvent_dataTxDone, arqEvent_ackTxDone, arqEvent_ackRcvd, arqEvent_arqTimeout)
             else if (L2_event_checkEventFlag(L2_event_dataTxDone)) //if data needs to be sent (keyboard input)
@@ -343,6 +368,13 @@ void L2_FSMrun(void)
                 uint8_t brflag = L2_LLI_getIsBroadcasted();
                 uint8_t flag_end = L2_msg_checkIfEndData(dataPtr);
 
+                //L3_LLI_dataInd(L2_msg_getWord(dataPtr), srcId, size-L2_MSG_OFFSET_DATA, L2_LLI_getSnr(), L2_LLI_getRssi());
+#ifndef DISABLE_ARQ                
+                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr)) {
+                    debug("[L3][WARNING] Invalid PDU SN (%i) while (%i) is required! (Ignoring SN check for multi-node)\n", L2_msg_getSeq(dataPtr), seqNum);
+                }
+#endif
+                L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);
 
 #ifdef DISABLE_ARQ
                 main_state = L2STATE_IDLE;
