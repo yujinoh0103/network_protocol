@@ -8,7 +8,7 @@
 #define L3_JUDGE_STATE_IDLE             0
 #define L3_JUDGE_STATE_RUNNING          1
 
-#define L3_JUDGE_MAX_PARTICIPANTS       4
+#define L3_JUDGE_MAX_PARTICIPANTS       1
 #define L3_JUDGE_NICKNAME               L3_JUDGE_NICKNAME_STR
 #define L3_JUDGE_FIRST_TURN_TIMEOUT_SEC 30
 
@@ -16,6 +16,8 @@
 void L3_judge_initIDLE(void);
 // IDLE 상태 이벤트 핸들러
 void L3_judge_handleIDLE(void);
+// RUNNING 상태 이벤트 핸들러
+void L3_judge_handleRUNNING(void);
 
 // 상태 접근 및 관리 함수
 uint8_t L3_judge_getCurrentState(void);

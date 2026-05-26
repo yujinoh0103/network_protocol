@@ -3,6 +3,7 @@
 #include "L3_timer.h"
 #include "L3_LLinterface.h"
 #include "L3_FSMmain_judge.h"
+#include "L3_FSMmain_player.h"
 #include "protocol_parameters.h"
 #include "mbed.h"
 
@@ -19,7 +20,6 @@ static uint8_t prev_state = main_state;
 static uint8_t originalWord[1030];
 static uint8_t wordLen=0;
 
-static uint8_t sdu[1030];
 
 //serial port interface
 static Serial pc(USBTX, USBRX);
@@ -77,7 +77,7 @@ void L3_initFSM(uint8_t destId)
     //initialize service layer
     pc.attach(&L3service_processInputWord, Serial::RxIrq);
 
-    pc.printf("Give a word to send : ");
+    L3_player_initFSM(); // player FSM 초기화 (닉네임 입력 프롬프트 출력)
 }
 
 void L3_FSMrun(void)
@@ -91,48 +91,31 @@ void L3_FSMrun(void)
     if (isJudgeNode) {
         if (L3_judge_getCurrentState() == L3_JUDGE_STATE_IDLE) {
             L3_judge_handleIDLE();
+        } else if (L3_judge_getCurrentState() == L3_JUDGE_STATE_RUNNING) {
+            L3_judge_handleRUNNING();
         }
         return;
     }
 
-    //FSM should be implemented here! ---->>>>
-    switch (main_state)
-    {
-        case L3STATE_IDLE: //IDLE state description
-            
-            if (L3_event_checkEventFlag(L3_event_msgRcvd)) //if data reception event happens
-            {
-                //Retrieving data info.
-                uint8_t* dataPtr = L3_LLI_getMsgPtr();
-                uint8_t size = L3_LLI_getSize();
+    // player FSM 실행 — L3_FSMmain_player.cpp가 모든 상태 처리
+    L3_player_runFSM();
+}
 
-                debug("\n -------------------------------------------------\nRCVD MSG : %s (length:%i)\n -------------------------------------------------\n", 
-                            dataPtr, size);
-                
-                pc.printf("Give a word to send : ");
-                
-                L3_event_clearEventFlag(L3_event_msgRcvd);
-            }
-            else if (L3_event_checkEventFlag(L3_event_dataToSend)) //if data needs to be sent (keyboard input)
-            {
-                //msg header setting
-                strcpy((char*)sdu, (char*)originalWord);
-                debug("[L3] msg length : %i\n", wordLen);
-                if (wordLen > 0) {
-                    uint8_t sendLen = (uint8_t)(wordLen - 1);
-                    L3_LLI_dataReqFunc(sdu, sendLen, myDestId);
-                }
+// -------------------------------------------------------
+// player FSM이 읽어갈 키보드 입력 접근자
+// -------------------------------------------------------
+const char* L3_getInputWord(void)
+{
+    return (const char*)originalWord;
+}
 
-                debug_if(DBGMSG_L3, "[L3] sending msg....\n");
-                wordLen = 0;
+uint8_t L3_getInputWordLen(void)
+{
+    return (wordLen > 0) ? (wordLen - 1) : 0; // null terminator 제외
+}
 
-                pc.printf("Give a word to send : ");
-
-                L3_event_clearEventFlag(L3_event_dataToSend);
-            }
-            break;
-
-        default :
-            break;
-    }
+void L3_clearInputWord(void)
+{
+    wordLen = 0;
+    L3_event_clearEventFlag(L3_event_dataToSend);
 }

@@ -12,13 +12,13 @@ static uint8_t timerStatus = 0;
 void L3_timer_timeoutHandler(void) 
 {
     timerStatus = 0;
-    //L3_event_setEventFlag(L3_event_arqTimeout);
+    L3_event_setEventFlag(L3_event_arqTimeout); // WAIT_ACK 타이머 만료 → 이벤트 발생
 }
 
 //timer related functions ---------------------------
 void L3_timer_startTimer()
 {
-    uint8_t waitTime = 1;//L2_ARQ_MINWAITTIME + rand()%(L2_ARQ_MAXWAITTIME-L2_ARQ_MINWAITTIME); //timer length
+    uint8_t waitTime = L3_WAIT_ACK_TIMEOUT_SEC; // [R-JOIN-13] WAIT_ACK 타이머 = 3초
     timer.attach(L3_timer_timeoutHandler, waitTime);
     timerStatus = 1;
 }
