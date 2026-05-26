@@ -34,6 +34,8 @@ static void sendJoin(void);
 static void sendAnswer(const char* answer);
 static void retryJoinCallback(void);
 static uint8_t enterPlayingFromSetup(const L3Message* msg);
+static void trimNickname(char* nickname);
+static uint8_t isMyNickname(const char* nickname);
 
 // -------------------------------------------------------
 // 초기화
@@ -90,6 +92,7 @@ static void stateIdle(void)
 
     strncpy(myNickname, word, L3_MAX_NICKNAME_LEN - 1);
     myNickname[L3_MAX_NICKNAME_LEN - 1] = '\0';
+    trimNickname(myNickname);
     L3_clearInputWord();
 
     pc.printf("[Player] Nickname set: %s. Sending JOIN...\r\n", myNickname);
@@ -253,6 +256,27 @@ static uint8_t enterPlayingFromSetup(const L3Message* msg)
     return 1;
 }
 
+static void trimNickname(char* nickname)
+{
+    if (nickname == NULL) return;
+
+    uint8_t len = strlen(nickname);
+    while (len > 0 &&
+           (nickname[len - 1] == ' ' ||
+            nickname[len - 1] == '\t' ||
+            nickname[len - 1] == '\r' ||
+            nickname[len - 1] == '\n')) {
+        nickname[len - 1] = '\0';
+        len--;
+    }
+}
+
+static uint8_t isMyNickname(const char* nickname)
+{
+    if (nickname == NULL) return 0;
+    return (strncmp(nickname, myNickname, L3_MAX_NICKNAME_LEN) == 0) ? 1 : 0;
+}
+
 // -------------------------------------------------------
 // State: PLAYING
 // 역할: TURN 수신 → 키보드 입력 시 ANSWER 전송
@@ -265,7 +289,7 @@ static void statePlaying(void)
     // 내 턴이 아니면 Judge가 OUT_OF_TURN으로 판정한다.
     if (L3_event_checkEventFlag(L3_event_dataToSend)) {
         const char* answer = L3_getInputWord();
-        if (!L3_369engine_isMyTurnNow()) {
+        if (!isMyNickname(L3_369engine_getCurrentTurnPlayer())) {
             pc.printf("[Player] Out-of-turn input. Sending ANSWER for Judge validation.\r\n");
         }
         sendAnswer(answer);
@@ -286,11 +310,12 @@ static void statePlaying(void)
         // 369 엔진에 TURN 전달 → 내부 숫자 증가, 현재 턴 플레이어 갱신
         L3_369engine_onTurnReceived(&msg.body.turn);
 
-        pc.printf("[Player] TURN received. player=%s | currentNumber=%lu\r\n",
+        pc.printf("[Player] TURN received. player=%s | me=%s | currentNumber=%lu\r\n",
                   msg.body.turn.player_nickname,
+                  myNickname,
                   (unsigned long)L3_369engine_getCurrentNumber());
 
-        if (L3_369engine_isMyTurnNow()) {
+        if (isMyNickname(msg.body.turn.player_nickname)) {
             L3_clearInputWord(); // 이전 입력 클리어
             pc.printf("[Player] *** MY TURN! *** Enter answer and press Enter:\r\n> ");
         } else {
