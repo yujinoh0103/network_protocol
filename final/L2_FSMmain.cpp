@@ -222,6 +222,7 @@ void L2_FSMrun(void)
                 //msg header setting
                 pduSize = L2_msg_encodeData(arqPdu, sduIn, seqNum, sduLen, L2_event_checkEventFlag(L2_event_dataToSendBuffer) == 0);
                 L2_LLI_sendData(arqPdu, pduSize, destL2ID);
+            }
 
 #ifndef DISABLE_ARQ
             //ignore events (arqEvent_dataTxDone, arqEvent_ackTxDone, arqEvent_ackRcvd, arqEvent_arqTimeout)
