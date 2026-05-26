@@ -1,4 +1,5 @@
 #include "L3_369engine.h"
+#include "mbed.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -9,6 +10,9 @@ static char playerOrder[L3_MAX_PLAYERS][L3_MAX_NICKNAME_LEN];
 static uint8_t  playerCount  = 0;
 static uint32_t currentNumber = 0;
 static uint8_t  turnCount     = 0;
+static Timer turnTimer;
+static uint8_t currentTurnTimeoutSec = 0;
+static uint8_t turnTimerActive = 0;
 
 static void copyNickname(char* dest, const char* src)
 {
@@ -31,6 +35,11 @@ void L3_369engine_reset(void)
     currentTurnPlayer[0] = '\0';
     playerCount = 0;
     memset(playerOrder, 0, sizeof(playerOrder));
+
+    currentTurnTimeoutSec = 0;
+    turnTimerActive = 0;
+    turnTimer.stop();
+    turnTimer.reset();
 }
 
 void L3_369engine_setPlayerOrder(
@@ -63,9 +72,16 @@ uint8_t L3_369engine_isMyTurnNow(void)
 uint8_t L3_369engine_onTurnReceived(const L3TurnMsg* turn)
 {
     if (turn == NULL) return 0;
+
     turnCount++;
     currentNumber = turnCount;
     copyNickname(currentTurnPlayer, turn->player_nickname);
+
+    currentTurnTimeoutSec = turn->timeout_sec;
+    turnTimer.reset();
+    turnTimer.start();
+    turnTimerActive = 1;
+
     return 1;
 }
 
@@ -123,4 +139,20 @@ uint8_t L3_369engine_getTurnTimeout(uint32_t turnNumber)
     if (turnNumber <= 10) return 5;
     if (turnNumber <= 20) return 3;
     return 2;
+}
+
+uint8_t L3_369engine_isTurnTimedOut(void)
+{
+    if (!turnTimerActive) {
+        return 0;
+    }
+
+    if (currentTurnTimeoutSec == 0) {
+        return 0;
+    }
+
+    uint32_t elapsedMs = turnTimer.read_ms();
+    uint32_t timeoutMs = (uint32_t)currentTurnTimeoutSec * 1000U;
+
+    return (elapsedMs >= timeoutMs) ? 1 : 0;
 }

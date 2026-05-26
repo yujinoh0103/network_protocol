@@ -320,6 +320,27 @@ void L3_judge_handleRUNNING(void)
         L3_event_clearEventFlag(L3_event_dataSendCnf);
     }
 
+    // 현재 턴 timeout 확인
+    if (L3_369engine_isTurnTimedOut()) {
+        const char* expectedPlayer = L3_369engine_getCurrentTurnPlayer();
+
+        debug_if(DBGMSG_L3,
+                 "[L3_Judge] TIMEOUT! Player '%s'. Game Over.\n",
+                 expectedPlayer);
+
+        L3Message go;
+        memset(&go, 0, sizeof(go));
+        go.type = L3_MSG_GAMEOVER;
+        strncpy(go.body.gameover.eliminated_player_nickname,
+                expectedPlayer,
+                L3_MAX_NICKNAME_LEN - 1);
+        go.body.gameover.reason = L3_REASON_TIMEOUT;
+
+        judge_sendMessage(&go, L3_BROADCAST_ID);
+        L3_judge_initIDLE();
+        return;
+    }
+
     // 메시지 수신 이벤트 확인
     if (!L3_event_checkEventFlag(L3_event_msgRcvd)) {
         return;
