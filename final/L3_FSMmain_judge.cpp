@@ -17,6 +17,7 @@ extern Serial pc;
 static uint8_t judge_state = L3_JUDGE_STATE_IDLE;
 static uint8_t judge_participant_count = 0;
 static char    judge_participants[L3_JUDGE_MAX_PARTICIPANTS][L3_MAX_NICKNAME_LEN];
+static uint8_t current_turn_player_idx = 0;
 
 // 송신(TX) buffer
 static uint8_t judge_txBuf[L3_MAXDATASIZE];
@@ -26,6 +27,8 @@ static uint8_t judge_txBuf[L3_MAXDATASIZE];
 void L3_judge_initIDLE(void)
 {
     judge_participant_count = 0;
+    current_turn_player_idx = 0;
+    L3_369engine_reset();
 
     for (int i = 0; i < L3_JUDGE_MAX_PARTICIPANTS; i++) {
         memset(judge_participants[i], 0, L3_MAX_NICKNAME_LEN);
@@ -311,13 +314,32 @@ void L3_judge_handleIDLE(void)
     init_step = 1;
 }
 
-static uint8_t current_turn_player_idx = 0;
-
 void L3_judge_handleRUNNING(void)
 {
     // 데이터 전송 완료 이벤트는 무시
     if (L3_event_checkEventFlag(L3_event_dataSendCnf)) {
         L3_event_clearEventFlag(L3_event_dataSendCnf);
+    }
+
+    // 현재 턴 timeout 확인
+    if (L3_369engine_isTurnTimedOut()) {
+        const char* expectedPlayer = L3_369engine_getCurrentTurnPlayer();
+
+        debug_if(DBGMSG_L3,
+                 "[L3_Judge] TIMEOUT! Player '%s'. Game Over.\n",
+                 expectedPlayer);
+
+        L3Message go;
+        memset(&go, 0, sizeof(go));
+        go.type = L3_MSG_GAMEOVER;
+        strncpy(go.body.gameover.eliminated_player_nickname,
+                expectedPlayer,
+                L3_MAX_NICKNAME_LEN - 1);
+        go.body.gameover.reason = L3_REASON_TIMEOUT;
+
+        judge_sendMessage(&go, L3_BROADCAST_ID);
+        L3_judge_initIDLE();
+        return;
     }
 
     // 메시지 수신 이벤트 확인

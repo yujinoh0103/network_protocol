@@ -26,6 +26,7 @@ const char* L3_369engine_computeExpectedAnswer(uint32_t number, char* outValue, 
 const char* L3_369engine_computeExpectedAnswerForCurrentTurn(char* outValue, uint8_t outValueLen);
 uint8_t     L3_369engine_isAnswerCorrect(const char* value);
 uint8_t     L3_369engine_getTurnTimeout(uint32_t turnNumber);
+uint8_t     L3_369engine_isTurnTimedOut(void);
 
 #ifdef __cplusplus
 }

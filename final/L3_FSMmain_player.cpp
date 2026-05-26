@@ -33,6 +33,9 @@ static void statePlaying(void);
 static void sendJoin(void);
 static void sendAnswer(const char* answer);
 static void retryJoinCallback(void);
+static uint8_t enterPlayingFromSetup(const L3Message* msg);
+static void trimNickname(char* nickname);
+static uint8_t isMyNickname(const char* nickname);
 
 // -------------------------------------------------------
 // 초기화
@@ -89,6 +92,7 @@ static void stateIdle(void)
 
     strncpy(myNickname, word, L3_MAX_NICKNAME_LEN - 1);
     myNickname[L3_MAX_NICKNAME_LEN - 1] = '\0';
+    trimNickname(myNickname);
     L3_clearInputWord();
 
     pc.printf("[Player] Nickname set: %s. Sending JOIN...\r\n", myNickname);
@@ -115,11 +119,20 @@ static void stateWaitAck(void)
 
         uint8_t* dataPtr = L3_LLI_getMsgPtr();
         uint8_t  size    = L3_LLI_getSize();
+        L3MsgType type    = L3_msg_peekType(dataPtr, size);
 
-        if (L3_msg_peekType(dataPtr, size) != L3_MSG_JOIN_ACK) return;
+        if (type != L3_MSG_JOIN_ACK && type != L3_MSG_SETUP) return;
 
         L3Message msg;
         if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
+
+        // JOIN_ACK를 놓친 노드도 SETUP broadcast에 포함되어 있으면 게임에 합류한다.
+        if (type == L3_MSG_SETUP) {
+            if (enterPlayingFromSetup(&msg)) {
+                L3_timer_stopTimer();
+            }
+            return;
+        }
 
         // [R-JOIN-10] 닉네임 일치 확인
         if (strncmp(msg.body.join_ack.node_nickname,
@@ -197,40 +210,88 @@ static void stateJoining(void)
     L3Message msg;
     if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
 
+    enterPlayingFromSetup(&msg);
+}
+
+static uint8_t enterPlayingFromSetup(const L3Message* msg)
+{
+    if (msg == NULL || msg->type != L3_MSG_SETUP) {
+        return 0;
+    }
+
+    uint8_t foundMe = 0;
+    for (uint8_t i = 0; i < L3_MAX_PLAYERS; i++) {
+        if (strncmp(msg->body.setup.player_order[i],
+                    myNickname,
+                    L3_MAX_NICKNAME_LEN) == 0) {
+            foundMe = 1;
+            break;
+        }
+    }
+
+    if (!foundMe) {
+        pc.printf("[Player] SETUP received, but my nickname is not in order. Ignoring.\r\n");
+        return 0;
+    }
+
     // [R-SETUP-03] 내부 숫자 초기화 / [R-SETUP-04] 순번 확정
     L3_369engine_reset();
     L3_369engine_init(myNickname);
     L3_369engine_setPlayerOrder(
-        (const char (*)[L3_MAX_NICKNAME_LEN])msg.body.setup.player_order,
+        (const char (*)[L3_MAX_NICKNAME_LEN])msg->body.setup.player_order,
         L3_MAX_PLAYERS
     );
 
-    pc.printf("[Player] SETUP received. judge=%s\r\n", msg.body.setup.judge_nickname);
-    pc.printf("[Player] notice: %s\r\n", msg.body.setup.notice);
+    pc.printf("[Player] SETUP received. judge=%s\r\n", msg->body.setup.judge_nickname);
+    pc.printf("[Player] notice: %s\r\n", msg->body.setup.notice);
     pc.printf("[Player] order: %s / %s / %s / %s\r\n",
-              msg.body.setup.player_order[0],
-              msg.body.setup.player_order[1],
-              msg.body.setup.player_order[2],
-              msg.body.setup.player_order[3]);
+              msg->body.setup.player_order[0],
+              msg->body.setup.player_order[1],
+              msg->body.setup.player_order[2],
+              msg->body.setup.player_order[3]);
 
     L3_clearInputWord(); // PLAYING에서 답변 입력받을 준비
 
     playerState = PLAYER_STATE_PLAYING;
+    return 1;
+}
+
+static void trimNickname(char* nickname)
+{
+    if (nickname == NULL) return;
+
+    uint8_t len = strlen(nickname);
+    while (len > 0 &&
+           (nickname[len - 1] == ' ' ||
+            nickname[len - 1] == '\t' ||
+            nickname[len - 1] == '\r' ||
+            nickname[len - 1] == '\n')) {
+        nickname[len - 1] = '\0';
+        len--;
+    }
+}
+
+static uint8_t isMyNickname(const char* nickname)
+{
+    if (nickname == NULL) return 0;
+    return (strncmp(nickname, myNickname, L3_MAX_NICKNAME_LEN) == 0) ? 1 : 0;
 }
 
 // -------------------------------------------------------
 // State: PLAYING
-// 역할: TURN 수신 → 내 차례이면 키보드 입력 대기 → ANSWER 전송
+// 역할: TURN 수신 → 키보드 입력 시 ANSWER 전송
 //       GAMEOVER 수신 → IDLE 복귀
 // [R-TURN-04][R-TURN-05][R-GAMEOVER-04]
 // -------------------------------------------------------
 static void statePlaying(void)
 {
-    // 내 차례이고 Enter를 눌렀으면 ANSWER 전송
-    if (L3_369engine_isMyTurnNow() &&
-        L3_event_checkEventFlag(L3_event_dataToSend))
-    {
+    // PLAYING 중 입력이 들어오면 Judge에게 전송한다.
+    // 내 턴이 아니면 Judge가 OUT_OF_TURN으로 판정한다.
+    if (L3_event_checkEventFlag(L3_event_dataToSend)) {
         const char* answer = L3_getInputWord();
+        if (!isMyNickname(L3_369engine_getCurrentTurnPlayer())) {
+            pc.printf("[Player] Out-of-turn input. Sending ANSWER for Judge validation.\r\n");
+        }
         sendAnswer(answer);
         L3_clearInputWord();
     }
@@ -249,11 +310,12 @@ static void statePlaying(void)
         // 369 엔진에 TURN 전달 → 내부 숫자 증가, 현재 턴 플레이어 갱신
         L3_369engine_onTurnReceived(&msg.body.turn);
 
-        pc.printf("[Player] TURN received. player=%s | currentNumber=%lu\r\n",
+        pc.printf("[Player] TURN received. player=%s | me=%s | currentNumber=%lu\r\n",
                   msg.body.turn.player_nickname,
+                  myNickname,
                   (unsigned long)L3_369engine_getCurrentNumber());
 
-        if (L3_369engine_isMyTurnNow()) {
+        if (isMyNickname(msg.body.turn.player_nickname)) {
             L3_clearInputWord(); // 이전 입력 클리어
             pc.printf("[Player] *** MY TURN! *** Enter answer and press Enter:\r\n> ");
         } else {

@@ -148,7 +148,7 @@ int L2_aggregateData(uint8_t* dataPtr, uint8_t srcId, uint8_t size, uint8_t brfl
     pduBufferSize+=size-L2_MSG_OFFSET_DATA;
 
     debug_if(DBGMSG_L2, "[L2] Aggregation PDU : size : %i end : %i\n", pduBufferSize, flag_end);
-    if (brflag == 1 || flag_end == 1)
+    if (flag_end == 1)
     {
         L3_LLI_dataInd(pduBuffer, srcId, pduBufferSize, L2_LLI_getSnr(), L2_LLI_getRssi());
         pduBufferSize = 0;
@@ -302,7 +302,9 @@ void L2_FSMrun(void)
                     if (destL2ID == L2_BROADCAST_ID)
                     {
                         main_state = L2STATE_IDLE;
-                         L3_LLI_dataCnf(1);
+                        if (!L2_event_checkEventFlag(L2_event_dataToSendBuffer)) {
+                            L3_LLI_dataCnf(1);
+                        }
                     }
                     else
                     {

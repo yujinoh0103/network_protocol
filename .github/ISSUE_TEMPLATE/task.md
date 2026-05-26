@@ -31,7 +31,6 @@ assignees: ''
 
 ## 스펙 확인 사항
 <!-- 최종 스펙과 맞는지 확인해야 할 내용을 적어주세요. 필요 없는 항목은 지워도 됩니다. -->
-- [ ] ACK는 L2에서 처리한다.
 - [ ] L3 메시지는 JOIN, SETUP, TURN, ANSWER, GAMEOVER만 사용한다.
 - [ ] JOIN은 dst=0으로 전송한다.
 - [ ] SETUP, TURN, ANSWER, GAMEOVER는 브로드캐스트 방식으로 처리한다.
