@@ -47,7 +47,6 @@ static void L3service_processInputWord(void)
         {
             originalWord[wordLen++] = '\0';
             L3_event_setEventFlag(L3_event_dataToSend);
-            debug_if(DBGMSG_L3,"word is ready! ::: %s\n", originalWord);
         }
         else
         {
