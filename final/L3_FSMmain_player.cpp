@@ -255,17 +255,19 @@ static uint8_t enterPlayingFromSetup(const L3Message* msg)
 
 // -------------------------------------------------------
 // State: PLAYING
-// 역할: TURN 수신 → 내 차례이면 키보드 입력 대기 → ANSWER 전송
+// 역할: TURN 수신 → 키보드 입력 시 ANSWER 전송
 //       GAMEOVER 수신 → IDLE 복귀
 // [R-TURN-04][R-TURN-05][R-GAMEOVER-04]
 // -------------------------------------------------------
 static void statePlaying(void)
 {
-    // 내 차례이고 Enter를 눌렀으면 ANSWER 전송
-    if (L3_369engine_isMyTurnNow() &&
-        L3_event_checkEventFlag(L3_event_dataToSend))
-    {
+    // PLAYING 중 입력이 들어오면 Judge에게 전송한다.
+    // 내 턴이 아니면 Judge가 OUT_OF_TURN으로 판정한다.
+    if (L3_event_checkEventFlag(L3_event_dataToSend)) {
         const char* answer = L3_getInputWord();
+        if (!L3_369engine_isMyTurnNow()) {
+            pc.printf("[Player] Out-of-turn input. Sending ANSWER for Judge validation.\r\n");
+        }
         sendAnswer(answer);
         L3_clearInputWord();
     }
