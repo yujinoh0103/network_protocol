@@ -17,6 +17,7 @@ extern Serial pc;
 static uint8_t judge_state = L3_JUDGE_STATE_IDLE;
 static uint8_t judge_participant_count = 0;
 static char    judge_participants[L3_JUDGE_MAX_PARTICIPANTS][L3_MAX_NICKNAME_LEN];
+static uint8_t current_turn_player_idx = 0;
 
 // 송신(TX) buffer
 static uint8_t judge_txBuf[L3_MAXDATASIZE];
@@ -26,6 +27,8 @@ static uint8_t judge_txBuf[L3_MAXDATASIZE];
 void L3_judge_initIDLE(void)
 {
     judge_participant_count = 0;
+    current_turn_player_idx = 0;
+    L3_369engine_reset();
 
     for (int i = 0; i < L3_JUDGE_MAX_PARTICIPANTS; i++) {
         memset(judge_participants[i], 0, L3_MAX_NICKNAME_LEN);
@@ -310,8 +313,6 @@ void L3_judge_handleIDLE(void)
     // 보조 변수 init_step을 1로 바꾸어 다음 전송 완료(dataSendCnf)를 대기
     init_step = 1;
 }
-
-static uint8_t current_turn_player_idx = 0;
 
 void L3_judge_handleRUNNING(void)
 {

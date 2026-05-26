@@ -33,6 +33,7 @@ static void statePlaying(void);
 static void sendJoin(void);
 static void sendAnswer(const char* answer);
 static void retryJoinCallback(void);
+static uint8_t enterPlayingFromSetup(const L3Message* msg);
 
 // -------------------------------------------------------
 // 초기화
@@ -115,11 +116,20 @@ static void stateWaitAck(void)
 
         uint8_t* dataPtr = L3_LLI_getMsgPtr();
         uint8_t  size    = L3_LLI_getSize();
+        L3MsgType type    = L3_msg_peekType(dataPtr, size);
 
-        if (L3_msg_peekType(dataPtr, size) != L3_MSG_JOIN_ACK) return;
+        if (type != L3_MSG_JOIN_ACK && type != L3_MSG_SETUP) return;
 
         L3Message msg;
         if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
+
+        // JOIN_ACK를 놓친 노드도 SETUP broadcast에 포함되어 있으면 게임에 합류한다.
+        if (type == L3_MSG_SETUP) {
+            if (enterPlayingFromSetup(&msg)) {
+                L3_timer_stopTimer();
+            }
+            return;
+        }
 
         // [R-JOIN-10] 닉네임 일치 확인
         if (strncmp(msg.body.join_ack.node_nickname,
@@ -197,25 +207,50 @@ static void stateJoining(void)
     L3Message msg;
     if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
 
+    enterPlayingFromSetup(&msg);
+}
+
+static uint8_t enterPlayingFromSetup(const L3Message* msg)
+{
+    if (msg == NULL || msg->type != L3_MSG_SETUP) {
+        return 0;
+    }
+
+    uint8_t foundMe = 0;
+    for (uint8_t i = 0; i < L3_MAX_PLAYERS; i++) {
+        if (strncmp(msg->body.setup.player_order[i],
+                    myNickname,
+                    L3_MAX_NICKNAME_LEN) == 0) {
+            foundMe = 1;
+            break;
+        }
+    }
+
+    if (!foundMe) {
+        pc.printf("[Player] SETUP received, but my nickname is not in order. Ignoring.\r\n");
+        return 0;
+    }
+
     // [R-SETUP-03] 내부 숫자 초기화 / [R-SETUP-04] 순번 확정
     L3_369engine_reset();
     L3_369engine_init(myNickname);
     L3_369engine_setPlayerOrder(
-        (const char (*)[L3_MAX_NICKNAME_LEN])msg.body.setup.player_order,
+        (const char (*)[L3_MAX_NICKNAME_LEN])msg->body.setup.player_order,
         L3_MAX_PLAYERS
     );
 
-    pc.printf("[Player] SETUP received. judge=%s\r\n", msg.body.setup.judge_nickname);
-    pc.printf("[Player] notice: %s\r\n", msg.body.setup.notice);
+    pc.printf("[Player] SETUP received. judge=%s\r\n", msg->body.setup.judge_nickname);
+    pc.printf("[Player] notice: %s\r\n", msg->body.setup.notice);
     pc.printf("[Player] order: %s / %s / %s / %s\r\n",
-              msg.body.setup.player_order[0],
-              msg.body.setup.player_order[1],
-              msg.body.setup.player_order[2],
-              msg.body.setup.player_order[3]);
+              msg->body.setup.player_order[0],
+              msg->body.setup.player_order[1],
+              msg->body.setup.player_order[2],
+              msg->body.setup.player_order[3]);
 
     L3_clearInputWord(); // PLAYING에서 답변 입력받을 준비
 
     playerState = PLAYER_STATE_PLAYING;
+    return 1;
 }
 
 // -------------------------------------------------------
