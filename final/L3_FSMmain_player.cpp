@@ -310,11 +310,6 @@ static void statePlaying(void)
         // 369 엔진에 TURN 전달 → 내부 숫자 증가, 현재 턴 플레이어 갱신
         L3_369engine_onTurnReceived(&msg.body.turn);
 
-        pc.printf("[Player] TURN received. player=%s | me=%s | currentNumber=%lu\r\n",
-                  msg.body.turn.player_nickname,
-                  myNickname,
-                  (unsigned long)L3_369engine_getCurrentNumber());
-
         if (isMyNickname(msg.body.turn.player_nickname)) {
             L3_clearInputWord(); // 이전 입력 클리어
             pc.printf("[Player] *** MY TURN! *** Enter answer and press Enter:\r\n> ");
