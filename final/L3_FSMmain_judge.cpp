@@ -93,6 +93,19 @@ int L3_judge_isNicknameRegistered(const char* nickname)
     return 0;
 }
 
+static uint8_t judge_getNodeIdForNickname(const char* nickname)
+{
+    if (nickname == NULL || nickname[0] == '\0') {
+        return 0xFF;
+    }
+    for (uint8_t i = 0; i < judge_participant_count; i++) {
+        if (strncmp(judge_participants[i], nickname, L3_MAX_NICKNAME_LEN) == 0) {
+            return judge_participant_node_ids[i];
+        }
+    }
+    return 0xFF;
+}
+
 // 노드 번호 중복 체크 (1=등록됨, 0=미등록)
 int L3_judge_isNodeIdRegistered(uint8_t nodeId)
 {
@@ -296,6 +309,16 @@ void L3_judge_handleIDLE(void)
 
     // 중복 닉네임 체크
     if (L3_judge_isNicknameRegistered(nickname)) {
+        uint8_t registeredNodeId = judge_getNodeIdForNickname(nickname);
+        if (registeredNodeId == srcId) {
+            L3Message ack;
+            L3_judge_buildJoinAck(&ack, nickname, judge_participant_count);
+            judge_sendMessage(&ack, srcId);
+            debug_if(DBGMSG_L3,
+                     "[Judge] status JOIN_ACK -> '%s' (count=%u, destL2=%u)\n",
+                     nickname, (unsigned)judge_participant_count, (unsigned)srcId);
+            return;
+        }
         debug_if(DBGMSG_L3,
                  "[Judge] duplicate nickname '%s'. Enter another nickname.\n",
                  nickname);

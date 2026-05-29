@@ -31,6 +31,7 @@ int main(void){
         "\r\n"
         "[SETTING]\r\n"
         "Node 0 is Judge. Other nodes are Players.\r\n"
+        "Only one Judge is allowed.\r\n"
         "Nickname: English only, max 8 chars.\r\n"
         "\r\n"
         "[FLOW]\r\n"
@@ -43,6 +44,12 @@ int main(void){
     pc.printf("\r\nNode number > ");
     pc.scanf("%d", &input_thisId);
     pc.getc();
+
+    if (input_thisId == 0) {
+        pc.printf("[Judge] Node 0 selected.\r\n");
+        pc.printf("[Judge] If a Judge already exists, reset this board\r\n");
+        pc.printf("[Judge] and register as a Player with another node number.\r\n");
+    }
 
     pc.printf("Node=%i\r\n", input_thisId);
     

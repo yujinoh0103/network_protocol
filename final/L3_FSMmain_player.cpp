@@ -25,6 +25,9 @@ static uint8_t joiningWaitPrinted  = 0;
 static uint8_t waitAckRetryPending = 0;
 static uint8_t joinRetryCount      = 0;
 static Timeout retryTimer;
+static Timer judgeWaitTimer;
+static uint8_t judgeWaitTimerActive = 0;
+static uint8_t joiningProbePending = 0;
 
 // -------------------------------------------------------
 // Forward declarations
@@ -37,6 +40,7 @@ static void sendJoin(void);
 static void sendAnswer(const char* answer);
 static void retryJoinCallback(void);
 static void printJoiningWaitStatus(void);
+static void resetPlayerAfterJudgeLost(void);
 static uint8_t enterPlayingFromSetup(const L3Message* msg);
 static void trimNickname(char* nickname);
 static uint8_t isMyNickname(const char* nickname);
@@ -53,6 +57,9 @@ void L3_player_initFSM(void)
     isJudgeKnown        = 0;
     waitAckRetryPending = 0;
     joinRetryCount      = 0;
+    judgeWaitTimerActive = 0;
+    joiningProbePending = 0;
+    judgeWaitTimer.stop();
 
     L3_clearInputWord(); // 혹시 남아있는 입력 버퍼 클리어
 
@@ -175,6 +182,10 @@ static void stateWaitAck(void)
                   msg.body.join_ack.registered_count);
         lastRegisteredCount = msg.body.join_ack.registered_count;
         joiningWaitPrinted = 0;
+        joiningProbePending = 0;
+        judgeWaitTimer.reset();
+        judgeWaitTimer.start();
+        judgeWaitTimerActive = 1;
         playerState = PLAYER_STATE_JOINING;
         return;
     }
@@ -223,7 +234,29 @@ static void stateJoining(void)
         joiningWaitPrinted = 1;
     }
 
-    if (!L3_event_checkEventFlag(L3_event_msgRcvd)) return;
+    if (!L3_event_checkEventFlag(L3_event_msgRcvd)) {
+        if (judgeWaitTimerActive &&
+            judgeWaitTimer.read_ms() >= (L3_SETUP_WAIT_TIMEOUT_SEC * 1000)) {
+            if (lastRegisteredCount < L3_JUDGE_MAX_PARTICIPANTS) {
+                if (joiningProbePending) {
+                    pc.printf("[Player] Judge is not responding while waiting for players.\r\n");
+                    pc.printf("[Player] Reset this board and wait for the Judge to restart.\r\n");
+                    resetPlayerAfterJudgeLost();
+                } else {
+                    pc.printf("[Player] Checking Judge status while waiting for players...\r\n");
+                    sendJoin();
+                    joiningProbePending = 1;
+                    judgeWaitTimer.reset();
+                    judgeWaitTimer.start();
+                }
+            } else {
+                pc.printf("[Player] Judge is not responding before game setup.\r\n");
+                pc.printf("[Player] Reset this board and wait for the Judge to restart.\r\n");
+                resetPlayerAfterJudgeLost();
+            }
+        }
+        return;
+    }
     L3_event_clearEventFlag(L3_event_msgRcvd);
 
     uint8_t*  dataPtr = L3_LLI_getMsgPtr();
@@ -236,12 +269,37 @@ static void stateJoining(void)
         return;
     }
 
+    if (type == L3_MSG_JOIN_ACK) {
+        L3Message msg;
+        if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
+        if (strncmp(msg.body.join_ack.node_nickname,
+                    myNickname, L3_MAX_NICKNAME_LEN) != 0) {
+            return;
+        }
+
+        lastRegisteredCount = msg.body.join_ack.registered_count;
+        joiningProbePending = 0;
+        joiningWaitPrinted = 0;
+        judgeWaitTimer.reset();
+        judgeWaitTimer.start();
+        judgeWaitTimerActive = 1;
+
+        pc.printf("[Player] Judge status updated. registered_count=%d\r\n",
+                  lastRegisteredCount);
+        printJoiningWaitStatus();
+        joiningWaitPrinted = 1;
+        return;
+    }
+
     if (type != L3_MSG_SETUP) return;
 
     L3Message msg;
     if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
 
-    enterPlayingFromSetup(&msg);
+    if (enterPlayingFromSetup(&msg)) {
+        judgeWaitTimerActive = 0;
+        judgeWaitTimer.stop();
+    }
 }
 
 static void printJoiningWaitStatus(void)
@@ -340,7 +398,14 @@ static void statePlaying(void)
         L3_clearInputWord();
     }
 
-    if (!L3_event_checkEventFlag(L3_event_msgRcvd)) return;
+    if (!L3_event_checkEventFlag(L3_event_msgRcvd)) {
+        if (L3_369engine_isTurnTimedOut()) {
+            pc.printf("[Player] Judge is not responding.\r\n");
+            pc.printf("[Player] Reset this board and wait for the Judge to restart.\r\n");
+            resetPlayerAfterJudgeLost();
+        }
+        return;
+    }
     L3_event_clearEventFlag(L3_event_msgRcvd);
 
     uint8_t*  dataPtr = L3_LLI_getMsgPtr();
@@ -396,6 +461,8 @@ static void statePlaying(void)
         isJudgeKnown        = 0;
         joinRetryCount      = 0;
         waitAckRetryPending = 0;
+        judgeWaitTimerActive = 0;
+        judgeWaitTimer.stop();
         myNickname[0]       = '\0';
         L3_clearInputWord();
 
@@ -403,6 +470,20 @@ static void statePlaying(void)
         pc.printf("[Player] Enter your nickname to rejoin:\r\n> ");
         return;
     }
+}
+
+static void resetPlayerAfterJudgeLost(void)
+{
+    L3_369engine_reset();
+    isJudgeKnown         = 0;
+    joinRetryCount       = 0;
+    waitAckRetryPending  = 0;
+    judgeWaitTimerActive = 0;
+    judgeWaitTimer.stop();
+    joiningProbePending = 0;
+    myNickname[0]        = '\0';
+    L3_clearInputWord();
+    playerState = PLAYER_STATE_IDLE;
 }
 
 // -------------------------------------------------------

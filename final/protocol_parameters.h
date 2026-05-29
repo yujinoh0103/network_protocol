@@ -7,6 +7,7 @@
 #define L3_WAIT_ACK_TIMEOUT_SEC         3   // WAIT_ACK 타이머 기본값 (3초)
 #define L3_JOIN_RETRY_DELAY_SEC         2   // 타임아웃 후 재전송 전 대기 (3초)
 #define L3_JOIN_MAX_RETRY               3   // 최대 재시도 횟수
+#define L3_SETUP_WAIT_TIMEOUT_SEC       15  // JOIN_ACK 이후 SETUP 대기 시간
 
 
 #define L2_ARQ_MAXRETRANSMISSION        10
