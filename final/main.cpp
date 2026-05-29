@@ -10,7 +10,6 @@ Serial pc(USBTX, USBRX);
 
 //source/destination ID
 uint8_t input_thisId=1;
-uint8_t input_destId=0;
 
 //FSM operation implementation ------------------------------------------------
 int main(void){
@@ -31,7 +30,6 @@ int main(void){
         "\r\n"
         "[SETTING]\r\n"
         "Node 0 is Judge. Other nodes are Players.\r\n"
-        "Destination can be any node except your own node.\r\n"
         "Nickname: English only, max 8 chars.\r\n"
         "\r\n"
         "[FLOW]\r\n"
@@ -43,21 +41,15 @@ int main(void){
         //source & destination ID setting
     pc.printf("\r\nNode number > ");
     pc.scanf("%d", &input_thisId);
-    pc.printf("Destination node > ");
-    pc.scanf("%d", &input_destId);
-    while (input_destId == input_thisId) {
-        pc.printf("Destination cannot be your own node. Enter another node > ");
-        pc.scanf("%d", &input_destId);
-    }
     pc.getc();
 
-    pc.printf("Node=%i, Dest=%i\r\n", input_thisId, input_destId);
+    pc.printf("Node=%i\r\n", input_thisId);
     
     
 
     //initialize lower layer stacks
     L2_initFSM(input_thisId);
-    L3_initFSM(input_destId);
+    L3_initFSM(0);
     
     while(1)
     {
