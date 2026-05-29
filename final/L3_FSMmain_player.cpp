@@ -151,13 +151,23 @@ static void stateWaitAck(void)
         }
 
         L3_timer_stopTimer();
-        if (msg.body.join_ack.registered_count == 0) {
+        if (msg.body.join_ack.registered_count == L3_JOIN_REJECT_NODE_ID) {
             pc.printf("[Player] Node number is already registered.\r\n");
             pc.printf("[Player] Reset this board and enter another node number.\r\n");
             myNickname[0] = '\0';
             joinRetryCount = 0;
             waitAckRetryPending = 0;
             playerState = PLAYER_STATE_IDLE;
+            return;
+        }
+        if (msg.body.join_ack.registered_count == L3_JOIN_REJECT_NICKNAME) {
+            pc.printf("[Player] Nickname is already registered.\r\n");
+            pc.printf("[Player] Enter another nickname:\r\n> ");
+            myNickname[0] = '\0';
+            joinRetryCount = 0;
+            waitAckRetryPending = 0;
+            playerState = PLAYER_STATE_IDLE;
+            L3_clearInputWord();
             return;
         }
 

@@ -297,8 +297,11 @@ void L3_judge_handleIDLE(void)
     // 중복 닉네임 체크
     if (L3_judge_isNicknameRegistered(nickname)) {
         debug_if(DBGMSG_L3,
-                 "[Judge] duplicate nickname '%s' — silently drop\n",
+                 "[Judge] duplicate nickname '%s'. Enter another nickname.\n",
                  nickname);
+        L3Message reject;
+        L3_judge_buildJoinAck(&reject, nickname, L3_JOIN_REJECT_NICKNAME);
+        judge_sendMessage(&reject, srcId);
         return; // 중복 닉네임 -> 드롭
     }
 
@@ -308,7 +311,7 @@ void L3_judge_handleIDLE(void)
                  "[Judge] node id %u is already registered. Enter another node number.\n",
                  (unsigned)srcId);
         L3Message reject;
-        L3_judge_buildJoinAck(&reject, nickname, 0);
+        L3_judge_buildJoinAck(&reject, nickname, L3_JOIN_REJECT_NODE_ID);
         judge_sendMessage(&reject, srcId);
         return; // 중복 노드 번호 -> 드롭
     }
