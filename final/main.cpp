@@ -45,6 +45,10 @@ int main(void){
     pc.scanf("%d", &input_thisId);
     pc.printf("Destination node > ");
     pc.scanf("%d", &input_destId);
+    while (input_destId == input_thisId) {
+        pc.printf("Destination cannot be your own node. Enter another node > ");
+        pc.scanf("%d", &input_destId);
+    }
     pc.getc();
 
     pc.printf("Node=%i, Dest=%i\r\n", input_thisId, input_destId);

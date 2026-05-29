@@ -27,7 +27,8 @@ const char* L3_judge_getParticipantNickname(uint8_t index);
 
 
 int L3_judge_isNicknameRegistered(const char* nickname); // 0 = not registered, 1 = already registered 
-int L3_judge_addParticipant(const char* nickname);
+int L3_judge_isNodeIdRegistered(uint8_t nodeId); // 0 = not registered, 1 = already registered
+int L3_judge_addParticipant(const char* nickname, uint8_t nodeId);
 
 // Build a JOIN_ACK Msg(참가자 승인)
 void L3_judge_buildJoinAck(L3Message* out, const char* nickname, uint8_t count);
