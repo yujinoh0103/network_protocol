@@ -9,6 +9,7 @@ static uint8_t rcvdSize;
 static int16_t rcvdRssi;
 static int8_t rcvdSnr;
 static uint8_t rcvdSrcId;
+static uint8_t lastDataCnfResult;
 
 //Downward primitives
 //TX function
@@ -29,6 +30,7 @@ void L3_LLI_dataInd(uint8_t* dataPtr, uint8_t srcId, uint8_t size, int8_t snr, i
 
 void L3_LLI_dataCnf(uint8_t res)
 {
+    lastDataCnfResult = res;
     L3_event_setEventFlag(L3_event_dataSendCnf);
 }
 void L3_LLI_reconfigSrcIdCnf(uint8_t res)
@@ -49,6 +51,11 @@ uint8_t L3_LLI_getSize()
 uint8_t L3_LLI_getSrcId()
 {
     return rcvdSrcId;
+}
+
+uint8_t L3_LLI_getLastDataCnfResult()
+{
+    return lastDataCnfResult;
 }
 
 void L3_LLI_setDataReqFunc(void (*funcPtr)(uint8_t*, uint8_t, uint8_t))

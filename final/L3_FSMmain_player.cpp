@@ -124,6 +124,17 @@ static void stateWaitAck(void)
 {
     if (waitAckRetryPending) return; // retryTimer 대기 중
 
+    if (L3_event_checkEventFlag(L3_event_dataSendCnf)) {
+        L3_event_clearEventFlag(L3_event_dataSendCnf);
+        if (!L3_LLI_getLastDataCnfResult()) {
+            pc.printf("[Player] Wireless link failed. L2 ACK was not received.\r\n");
+            pc.printf("[Player] Check radio/link, then reset this board and try again.\r\n");
+            L3_timer_stopTimer();
+            resetPlayerAfterJudgeLost();
+            return;
+        }
+    }
+
     // JOIN_ACK 수신 확인
     if (L3_event_checkEventFlag(L3_event_msgRcvd)) {
         L3_event_clearEventFlag(L3_event_msgRcvd);
@@ -196,12 +207,14 @@ static void stateWaitAck(void)
 
         joinRetryCount++;
         if (joinRetryCount >= L3_JOIN_MAX_RETRY) {
-            pc.printf("[Player] WAIT_ACK timeout %d times. Giving up.\r\n",
-                      joinRetryCount);
+            pc.printf("[Player] Judge is not responding during join/rejoin.\r\n");
+            pc.printf("[Player] Reset this board and wait for the Judge to restart.\r\n");
+            L3_timer_stopTimer();
+            resetPlayerAfterJudgeLost();
             return;
         }
 
-        pc.printf("[Player] WAIT_ACK timeout. Waiting 3s before retry (%d/3)...\r\n",
+        pc.printf("[Player] Judge is not responding yet. Retrying JOIN (%d/3)...\r\n",
                   joinRetryCount);
         waitAckRetryPending = 1;
         retryTimer.attach(&retryJoinCallback, (float)L3_JOIN_RETRY_DELAY_SEC); // [R-JOIN-08] 3초 대기 후 재전송
@@ -217,7 +230,6 @@ static void retryJoinCallback(void)
     // L3_event_dataToSend를 수동으로 set하여 IDLE에서 바로 닉네임 재사용
     // (originalWord는 이미 cleared 상태이므로 myNickname을 직접 사용)
     sendJoin();
-    joinRetryCount++; // 이미 올라가 있지만 재전송 횟수 추적
     L3_timer_startTimer();
     // WAIT_ACK 상태 유지 (IDLE 거치지 않고 바로 재시도)
     playerState = PLAYER_STATE_WAIT_ACK;
@@ -475,6 +487,7 @@ static void statePlaying(void)
 static void resetPlayerAfterJudgeLost(void)
 {
     L3_369engine_reset();
+    L3_timer_stopTimer();
     isJudgeKnown         = 0;
     joinRetryCount       = 0;
     waitAckRetryPending  = 0;

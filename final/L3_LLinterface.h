@@ -4,6 +4,7 @@ void L3_LLI_dataInd(uint8_t* dataPtr, uint8_t srcId, uint8_t size, int8_t snr, i
 uint8_t* L3_LLI_getMsgPtr();
 uint8_t L3_LLI_getSize();
 uint8_t L3_LLI_getSrcId();
+uint8_t L3_LLI_getLastDataCnfResult();
 void L3_LLI_setDataReqFunc(void (*funcPtr)(uint8_t*, uint8_t, uint8_t));
 void L3_LLI_setReconfigSrcIdReqFunc(void (*funcPtr)(uint8_t));
 void L3_LLI_dataCnf(uint8_t res);
