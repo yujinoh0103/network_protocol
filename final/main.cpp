@@ -41,15 +41,33 @@ int main(void){
         "=================================\r\n"
     );
         //source & destination ID setting
-    pc.printf("\r\nNode number > ");
-    pc.scanf("%d", &input_thisId);
-    pc.getc();
+    int nodeInput = 0;
+    int judgeConfirm = 0;
 
-    if (input_thisId == 0) {
-        pc.printf("[Judge] Node 0 selected.\r\n");
-        pc.printf("[Judge] If a Judge already exists, reset this board\r\n");
-        pc.printf("[Judge] and register as a Player with another node number.\r\n");
+    while (1) {
+        pc.printf("\r\nNode number > ");
+        pc.scanf("%d", &nodeInput);
+
+        if (nodeInput != 0) {
+            input_thisId = (uint8_t)nodeInput;
+            break;
+        }
+
+        pc.printf("[Judge] Node 0 is Judge mode.\r\n");
+        pc.printf("[Judge] Only ONE board can use Node 0.\r\n");
+        pc.printf("[Judge] Is this the only Judge? yes=1, no=0 > ");
+        pc.scanf("%d", &judgeConfirm);
+
+        if (judgeConfirm == 1) {
+            input_thisId = 0;
+            pc.printf("[Judge] Judge mode confirmed.\r\n");
+            break;
+        }
+
+        pc.printf("[Judge] Existing Judge detected by user.\r\n");
+        pc.printf("[Judge] Enter a Player node number instead.\r\n");
     }
+    pc.getc();
 
     pc.printf("Node=%i\r\n", input_thisId);
     
