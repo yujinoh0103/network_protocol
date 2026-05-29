@@ -307,6 +307,9 @@ void L3_judge_handleIDLE(void)
         debug_if(DBGMSG_L3,
                  "[Judge] node id %u is already registered. Enter another node number.\n",
                  (unsigned)srcId);
+        L3Message reject;
+        L3_judge_buildJoinAck(&reject, nickname, 0);
+        judge_sendMessage(&reject, srcId);
         return; // 중복 노드 번호 -> 드롭
     }
 

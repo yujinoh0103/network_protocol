@@ -151,6 +151,16 @@ static void stateWaitAck(void)
         }
 
         L3_timer_stopTimer();
+        if (msg.body.join_ack.registered_count == 0) {
+            pc.printf("[Player] Node number is already registered.\r\n");
+            pc.printf("[Player] Reset this board and enter another node number.\r\n");
+            myNickname[0] = '\0';
+            joinRetryCount = 0;
+            waitAckRetryPending = 0;
+            playerState = PLAYER_STATE_IDLE;
+            return;
+        }
+
         pc.printf("[Player] JOIN_ACK received. registered_count=%d -> JOINING\r\n",
                   msg.body.join_ack.registered_count);
         lastRegisteredCount = msg.body.join_ack.registered_count;
