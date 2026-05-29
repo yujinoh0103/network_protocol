@@ -10,7 +10,7 @@
 
 #define L3_JUDGE_MAX_PARTICIPANTS       4
 #define L3_JUDGE_NICKNAME               L3_JUDGE_NICKNAME_STR
-#define L3_JUDGE_FIRST_TURN_TIMEOUT_SEC 40
+#define L3_JUDGE_FIRST_TURN_TIMEOUT_SEC 30
 
 // IDLE 상태 초기화
 void L3_judge_initIDLE(void);

@@ -133,12 +133,11 @@ uint8_t L3_369engine_isAnswerCorrect(const char* value)
     return (strncmp(expected, value, L3_MAX_VALUE_LEN) == 0) ? 1 : 0;
 }
 
-// 스펙 기준 턴 타임아웃에 테스트 여유 시간 10초 추가
 uint8_t L3_369engine_getTurnTimeout(uint32_t turnNumber)
 {
-    if (turnNumber <= 10) return 15;
-    if (turnNumber <= 20) return 13;
-    return 12;
+    if (turnNumber <= 10) return 10;
+    if (turnNumber <= 20) return 7;
+    return 5;
 }
 
 uint8_t L3_369engine_isTurnTimedOut(void)

@@ -27,6 +27,7 @@ int main(void){
         "Type the right answer on your turn.\r\n"
         "If the number has 3, 6, or 9, type \"*\".\r\n"
         "Examples: 3 -> *, 13 -> *, 33 -> **, 36 -> **\r\n"
+        "Turn time gets shorter: 10s, 7s, then 5s.\r\n"
         "\r\n"
         "[SETTING]\r\n"
         "Node 0 is Judge. Other nodes are Players.\r\n"
