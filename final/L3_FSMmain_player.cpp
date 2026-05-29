@@ -1,6 +1,7 @@
 #include "mbed.h"
 #include "L3_FSMmain_player.h"
 #include "L3_FSMmain.h"
+#include "L3_FSMmain_judge.h"
 #include "L3_369engine.h"
 #include "L3_msg.h"
 #include "L3_FSMevent.h"
@@ -17,6 +18,8 @@ extern Serial pc;
 static PlayerState playerState  = PLAYER_STATE_IDLE;
 static char myNickname[L3_MAX_NICKNAME_LEN];
 static uint8_t isJudgeKnown     = 0;
+static uint8_t lastRegisteredCount = 0;
+static uint8_t joiningWaitPrinted  = 0;
 
 // WAIT_ACK 재전송 관리
 static uint8_t waitAckRetryPending = 0;
@@ -33,6 +36,7 @@ static void statePlaying(void);
 static void sendJoin(void);
 static void sendAnswer(const char* answer);
 static void retryJoinCallback(void);
+static void printJoiningWaitStatus(void);
 static uint8_t enterPlayingFromSetup(const L3Message* msg);
 static void trimNickname(char* nickname);
 static uint8_t isMyNickname(const char* nickname);
@@ -149,6 +153,8 @@ static void stateWaitAck(void)
         L3_timer_stopTimer();
         pc.printf("[Player] JOIN_ACK received. registered_count=%d -> JOINING\r\n",
                   msg.body.join_ack.registered_count);
+        lastRegisteredCount = msg.body.join_ack.registered_count;
+        joiningWaitPrinted = 0;
         playerState = PLAYER_STATE_JOINING;
         return;
     }
@@ -192,6 +198,11 @@ static void retryJoinCallback(void)
 // -------------------------------------------------------
 static void stateJoining(void)
 {
+    if (!joiningWaitPrinted) {
+        printJoiningWaitStatus();
+        joiningWaitPrinted = 1;
+    }
+
     if (!L3_event_checkEventFlag(L3_event_msgRcvd)) return;
     L3_event_clearEventFlag(L3_event_msgRcvd);
 
@@ -211,6 +222,19 @@ static void stateJoining(void)
     if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
 
     enterPlayingFromSetup(&msg);
+}
+
+static void printJoiningWaitStatus(void)
+{
+    if (lastRegisteredCount < L3_JUDGE_MAX_PARTICIPANTS) {
+        uint8_t remainingPlayers = L3_JUDGE_MAX_PARTICIPANTS - lastRegisteredCount;
+        pc.printf("[Player] Waiting for other players... (%d/%d joined, %d more)\r\n",
+                  lastRegisteredCount,
+                  L3_JUDGE_MAX_PARTICIPANTS,
+                  remainingPlayers);
+    } else {
+        pc.printf("[Player] All players joined. Waiting for game setup...\r\n");
+    }
 }
 
 static uint8_t enterPlayingFromSetup(const L3Message* msg)
@@ -324,9 +348,29 @@ static void statePlaying(void)
         L3Message msg;
         if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
 
-        pc.printf("[Player] GAMEOVER. eliminated=%s reason=%s -> IDLE\r\n",
-                  msg.body.gameover.eliminated_player_nickname,
-                  L3_elim_reason_to_string(msg.body.gameover.reason));
+        pc.printf(
+            "=================================\r\n"
+            "*                   GAME OVER!                   *\r\n"
+            "=================================\r\n"
+            "\r\n"
+            "        Oh no! A player has been eliminated.\r\n"
+            "        Let's take a tiny deep breath... :')\r\n"
+            "\r\n"
+            "--------------------------------------------------\r\n"
+            "* RESULT\r\n"
+            "--------------------------------------------------\r\n"
+            "\r\n"
+            "  Eliminated player : %s\r\n"
+            "  Reason            : %s\r\n"
+            "\r\n"
+            "--------------------------------------------------\r\n"
+            "\r\n"
+            "        * Moving to retry mode... *\r\n"
+            "          New nickname, new chance! :D\r\n"
+            "\r\n"
+            "=================================\r\n",
+            msg.body.gameover.eliminated_player_nickname,
+            L3_elim_reason_to_string(msg.body.gameover.reason));
 
         L3_369engine_reset();
         isJudgeKnown        = 0;

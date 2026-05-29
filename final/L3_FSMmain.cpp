@@ -55,7 +55,6 @@ static void L3service_processInputWord(void)
             {
                 originalWord[wordLen++] = '\0';
                 L3_event_setEventFlag(L3_event_dataToSend);
-                pc.printf("\n max reached! word forced to be ready :::: %s\n", originalWord);
             }
         }
     }
@@ -83,7 +82,6 @@ void L3_FSMrun(void)
 {   
     if (prev_state != main_state)
     {
-        debug_if(DBGMSG_L3, "[L3] State transition from %i to %i\n", prev_state, main_state);
         prev_state = main_state;
     }
 

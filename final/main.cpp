@@ -16,15 +16,38 @@ uint8_t input_destId=0;
 int main(void){
 
     //initialization
-    pc.printf("------------------ protocol stack starts! --------------------------\n");
+    pc.printf(
+        "\r\n\r\n"
+        "=================================\r\n"
+        "*                 369 GAME START!                 *\r\n"
+        "=================================\r\n"
+        "\r\n"
+        "Welcome to the 369 Star Game! :D\r\n"
+        "\r\n"
+        "[HOW TO PLAY]\r\n"
+        "Type the right answer on your turn.\r\n"
+        "If the number has 3, 6, or 9, type \"*\".\r\n"
+        "Examples: 3 -> *, 13 -> *, 33 -> **, 36 -> **\r\n"
+        "\r\n"
+        "[SETTING]\r\n"
+        "Node 0 is Judge. Other nodes are Players.\r\n"
+        "Destination can be any node except your own node.\r\n"
+        "Nickname: English only, max 8 chars.\r\n"
+        "\r\n"
+        "[FLOW]\r\n"
+        "4 players join. One elimination ends the game.\r\n"
+        "Then players enter a new nickname to retry.\r\n"
+        "\r\n"
+        "=================================\r\n"
+    );
         //source & destination ID setting
-    pc.printf(":: ID for this node : ");
+    pc.printf("\r\nNode number > ");
     pc.scanf("%d", &input_thisId);
-    pc.printf(":: ID for the destination : ");
+    pc.printf("Destination node > ");
     pc.scanf("%d", &input_destId);
     pc.getc();
 
-    pc.printf("endnode : %i, dest : %i\n", input_thisId, input_destId);
+    pc.printf("Node=%i, Dest=%i\r\n", input_thisId, input_destId);
     
     
 

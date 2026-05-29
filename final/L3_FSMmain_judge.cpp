@@ -22,6 +22,22 @@ static uint8_t current_turn_player_idx = 0;
 // 송신(TX) buffer
 static uint8_t judge_txBuf[L3_MAXDATASIZE];
 
+static void judge_printGameOver(const char* eliminatedNickname, L3ElimReason reason)
+{
+    pc.printf(
+        "=================================\r\n"
+        "*                   GAME OVER!                   *\r\n"
+        "=================================\r\n"
+        "\r\n"
+        "Eliminated player : %s\r\n"
+        "Reason            : %s\r\n"
+        "\r\n"
+        "Broadcasting GAMEOVER to all players.\r\n"
+        "=================================\r\n",
+        eliminatedNickname,
+        L3_elim_reason_to_string(reason));
+}
+
 
 // IDLE 상태 초기화
 void L3_judge_initIDLE(void)
@@ -38,7 +54,7 @@ void L3_judge_initIDLE(void)
     L3_event_clearEventFlag(L3_event_dataSendCnf); // 이전 게임의 잔류 이벤트 제거
 
     debug_if(DBGMSG_L3,
-             "[Judge] IDLE initialized. node_id=%u, waiting for JOIN...\n",
+             "[L3_Judge] IDLE initialized. node_id=%u, waiting for JOIN...\n",
              (unsigned)L3_JUDGE_NODE_ID);
 }
 
@@ -49,9 +65,6 @@ uint8_t L3_judge_getParticipantCount(void) { return judge_participant_count; }
 void L3_judge_setCurrentState(uint8_t newState)
 {
     if (judge_state != newState) {
-        debug_if(DBGMSG_L3,
-                 "[Judge] State transition: %u -> %u\n",
-                 (unsigned)judge_state, (unsigned)newState);
         judge_state = newState;
     }
 }
@@ -163,7 +176,7 @@ static uint8_t judge_sendMessage(const L3Message* msg, uint8_t destId)
 {
     uint8_t size = L3_msg_serialize(msg, judge_txBuf, L3_MAXDATASIZE);
     if (size == 0) {
-        debug_if(DBGMSG_L3, "[Judge] serialize failed for type=%d\n", (int)msg->type);
+        debug_if(DBGMSG_L3, "[L3_Judge] serialize failed for type=%d\n", (int)msg->type);
         return 0;
     }
     if (L3_LLI_dataReqFunc != NULL) {
@@ -188,7 +201,7 @@ void L3_judge_handleIDLE(void)
             if (L3_judge_buildSetup(&setupMsg)) {
                 judge_sendMessage(&setupMsg, L3_BROADCAST_ID);
                 debug_if(DBGMSG_L3,
-                         "[Judge] SETUP broadcast: %s,%s,%s,%s\n",
+                         "[L3_Judge] [R-SETUP-01] SETUP broadcast: %s,%s,%s,%s\n",
                          setupMsg.body.setup.player_order[0],
                          setupMsg.body.setup.player_order[1],
                          setupMsg.body.setup.player_order[2],
@@ -211,7 +224,7 @@ void L3_judge_handleIDLE(void)
                 L3_369engine_onTurnReceived(&turnMsg.body.turn);
 
                 debug_if(DBGMSG_L3,
-                         "[Judge] first TURN -> '%s' (timeout=%us)\n",
+                         "[L3_Judge] [R-SETUP-05] first TURN -> '%s' (timeout=%us)\n",
                          turnMsg.body.turn.player_nickname,
                          (unsigned)turnMsg.body.turn.timeout_sec);
             }
@@ -220,7 +233,7 @@ void L3_judge_handleIDLE(void)
             L3_judge_setCurrentState(L3_JUDGE_STATE_RUNNING);
             init_step = 0;
             debug_if(DBGMSG_L3,
-                     "[Judge] IDLE -> RUNNING. Game Phase entered.\n");
+                     "[L3_Judge] [R-SETUP-05] IDLE -> RUNNING. Game Phase entered.\n");
         }
         return;
     }
@@ -251,7 +264,7 @@ void L3_judge_handleIDLE(void)
     // JOIN 메시지만 처리
     if (inMsg.type != L3_MSG_JOIN) {
         debug_if(DBGMSG_L3,
-                 "[Judge] IDLE: non-JOIN type=%s — drop\n",
+                 "[L3_Judge] IDLE: non-JOIN type=%s — drop\n",
                  L3_msg_type_to_string(inMsg.type));
         return; // 다른 메시지 타입 -> 드롭
     }
@@ -260,14 +273,14 @@ void L3_judge_handleIDLE(void)
 
     // 유효한 닉네임 체크
     if (nickname[0] == '\0') {
-        debug_if(DBGMSG_L3, "[Judge] empty nickname — drop\n");
+        debug_if(DBGMSG_L3, "[L3_Judge] empty nickname — drop\n");
         return; // 빈 닉네임 -> 드롭
     }
 
     // 중복 닉네임 체크
     if (L3_judge_isNicknameRegistered(nickname)) {
         debug_if(DBGMSG_L3,
-                 "[Judge] duplicate nickname '%s' — silently drop\n",
+                 "[L3_Judge] duplicate nickname '%s' — silently drop\n",
                  nickname);
         return; // 중복 닉네임 -> 드롭
     }
@@ -275,19 +288,19 @@ void L3_judge_handleIDLE(void)
     // 참가자 수 초과 체크
     if (judge_participant_count >= L3_JUDGE_MAX_PARTICIPANTS) {
         debug_if(DBGMSG_L3,
-                 "[Judge] table full — drop JOIN from '%s'\n",
+                 "[L3_Judge] table full — drop JOIN from '%s'\n",
                  nickname);
         return; // 최대 참가자 수 초과 -> 드롭
     }
 
     // 모든 검증 통과 — 참가자 등록 진행
     if (!L3_judge_addParticipant(nickname)) {
-        debug_if(DBGMSG_L3, "[Judge] addParticipant failed for '%s'\n", nickname);
+        debug_if(DBGMSG_L3, "[L3_Judge] addParticipant failed for '%s'\n", nickname);
         return;
     }
 
     debug_if(DBGMSG_L3,
-             "[Judge] registered '%s' (#%u)\n",
+             "[L3_Judge] [R-JOIN-10] registered '%s' (#%u)\n",
              nickname, (unsigned)judge_participant_count);
 
     {
@@ -296,7 +309,7 @@ void L3_judge_handleIDLE(void)
         L3_judge_buildJoinAck(&ack, nickname, judge_participant_count);
         judge_sendMessage(&ack, srcId);
         debug_if(DBGMSG_L3,
-                 "[Judge] JOIN_ACK -> '%s' (count=%u, destL2=%u)\n",
+                 "[L3_Judge] [R-JOIN-10] JOIN_ACK -> '%s' (count=%u, destL2=%u)\n",
                  nickname, (unsigned)judge_participant_count, (unsigned)srcId);
     }
 
@@ -306,7 +319,7 @@ void L3_judge_handleIDLE(void)
 
     // 참가자 모두 등록 완료 — JOIN 단계 종료, Game Phase 단계 진입
     debug_if(DBGMSG_L3,
-             "[Judge] Join Phase complete (%d participants).\n",
+             "[L3_Judge] [R-JOIN-05] Join Phase complete (%d participants).\n",
              L3_JUDGE_MAX_PARTICIPANTS);
 
     // 바로 SETUP을 보내면 L2 버퍼에서 방금 보낸 JOIN_ACK를 덮어쓰게 되므로,
@@ -337,6 +350,8 @@ void L3_judge_handleRUNNING(void)
                 L3_MAX_NICKNAME_LEN - 1);
         go.body.gameover.reason = L3_REASON_TIMEOUT;
 
+        judge_printGameOver(go.body.gameover.eliminated_player_nickname,
+                            go.body.gameover.reason);
         judge_sendMessage(&go, L3_BROADCAST_ID);
         L3_judge_initIDLE();
         return;
@@ -360,16 +375,18 @@ void L3_judge_handleRUNNING(void)
     const char* value = inMsg.body.answer.value;
     const char* expectedPlayer = L3_369engine_getCurrentTurnPlayer();
 
-    debug_if(DBGMSG_L3, "[Judge] ANSWER received from '%s', value='%s'\n", sender, value);
+    debug_if(DBGMSG_L3, "[L3_Judge] ANSWER received from '%s', value='%s'\n", sender, value);
 
     // 1. 차례 확인
     if (strncmp(sender, expectedPlayer, L3_MAX_NICKNAME_LEN) != 0) {
-        debug_if(DBGMSG_L3, "[Judge] OUT_OF_TURN! Expected '%s'. Game Over.\n", expectedPlayer);
+        debug_if(DBGMSG_L3, "[L3_Judge] OUT_OF_TURN! Expected '%s'. Game Over.\n", expectedPlayer);
         L3Message go;
         memset(&go, 0, sizeof(go));
         go.type = L3_MSG_GAMEOVER;
         strncpy(go.body.gameover.eliminated_player_nickname, sender, L3_MAX_NICKNAME_LEN - 1);
         go.body.gameover.reason = L3_REASON_OUT_OF_TURN;
+        judge_printGameOver(go.body.gameover.eliminated_player_nickname,
+                            go.body.gameover.reason);
         judge_sendMessage(&go, L3_BROADCAST_ID);
         L3_judge_initIDLE();
         return;
@@ -377,19 +394,21 @@ void L3_judge_handleRUNNING(void)
 
     // 2. 정답 확인
     if (!L3_369engine_isAnswerCorrect(value)) {
-        debug_if(DBGMSG_L3, "[Judge] WRONG_ANSWER! Game Over.\n");
+        debug_if(DBGMSG_L3, "[L3_Judge] WRONG_ANSWER! Game Over.\n");
         L3Message go;
         memset(&go, 0, sizeof(go));
         go.type = L3_MSG_GAMEOVER;
         strncpy(go.body.gameover.eliminated_player_nickname, sender, L3_MAX_NICKNAME_LEN - 1);
         go.body.gameover.reason = L3_REASON_WRONG_ANSWER;
+        judge_printGameOver(go.body.gameover.eliminated_player_nickname,
+                            go.body.gameover.reason);
         judge_sendMessage(&go, L3_BROADCAST_ID);
         L3_judge_initIDLE();
         return;
     }
 
     // 3. 정답일 경우: 다음 턴 진행
-    debug_if(DBGMSG_L3, "[Judge] CORRECT! Advancing turn...\n");
+    debug_if(DBGMSG_L3, "[L3_Judge] CORRECT! Advancing turn...\n");
     current_turn_player_idx = (current_turn_player_idx + 1) % judge_participant_count;
 
     L3Message turnMsg;

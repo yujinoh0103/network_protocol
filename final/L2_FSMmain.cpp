@@ -325,7 +325,7 @@ void L2_FSMrun(void)
                 uint8_t* dataPtr = L2_LLI_getRcvdDataPtr();
                 if ( L2_msg_getSeq(arqPdu) == L2_msg_getSeq(dataPtr) )
                 {
-                    debug_if(DBGMSG_L2, "[L2] ACK is correctly received! \n");
+                    debug("[L2] ACK is correctly received! \n");
                     L2_timer_stopTimer();
                     main_state = L2STATE_IDLE;
                     L3_LLI_dataCnf(1);
