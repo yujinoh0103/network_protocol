@@ -410,14 +410,7 @@ static void statePlaying(void)
         L3_clearInputWord();
     }
 
-    if (!L3_event_checkEventFlag(L3_event_msgRcvd)) {
-        if (L3_369engine_isTurnTimedOut()) {
-            pc.printf("[Player] Judge is not responding.\r\n");
-            pc.printf("[Player] Reset this board and wait for the Judge to restart.\r\n");
-            resetPlayerAfterJudgeLost();
-        }
-        return;
-    }
+    if (!L3_event_checkEventFlag(L3_event_msgRcvd)) return;
     L3_event_clearEventFlag(L3_event_msgRcvd);
 
     uint8_t*  dataPtr = L3_LLI_getMsgPtr();
