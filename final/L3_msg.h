@@ -28,6 +28,7 @@ typedef enum {
     L3_MSG_TURN,
     L3_MSG_ANSWER,
     L3_MSG_GAMEOVER,
+    L3_MSG_JOIN_ABORT,
     L3_MSG_UNKNOWN
 } L3MsgType;
 

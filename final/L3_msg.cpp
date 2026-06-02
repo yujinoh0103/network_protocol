@@ -20,6 +20,8 @@ const char* L3_msg_type_to_string(L3MsgType type)
             return "ANSWER";
         case L3_MSG_GAMEOVER:
             return "GAMEOVER";
+        case L3_MSG_JOIN_ABORT:
+            return "JOIN_ABORT";
         default:
             return "UNKNOWN";
     }
@@ -68,6 +70,10 @@ L3MsgType L3_string_to_msg_type(const char* type_str)
 
     if (strcmp(type_str, "GAMEOVER") == 0) {
         return L3_MSG_GAMEOVER;
+    }
+
+    if (strcmp(type_str, "JOIN_ABORT") == 0) {
+        return L3_MSG_JOIN_ABORT;
     }
 
     return L3_MSG_UNKNOWN;
@@ -164,6 +170,9 @@ uint8_t L3_msg_serialize(const L3Message* msg, uint8_t* buffer, size_t bufSize)
             written = snprintf(out, bufSize, "GAMEOVER:%s:%s",
                                msg->body.gameover.eliminated_player_nickname,
                                L3_elim_reason_to_string(msg->body.gameover.reason));
+            break;
+        case L3_MSG_JOIN_ABORT:
+            written = snprintf(out, bufSize, "JOIN_ABORT");
             break;
         default:
             return 0;
@@ -281,6 +290,8 @@ int L3_msg_deserialize(const uint8_t* buffer, size_t size, L3Message* msg)
             msg->body.gameover.reason = L3_string_to_elim_reason(tok);
             return 1;
         }
+        case L3_MSG_JOIN_ABORT:
+            return 1;
         default:
             return 0;
     }

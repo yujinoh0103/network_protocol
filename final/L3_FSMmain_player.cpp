@@ -41,6 +41,7 @@ static void sendAnswer(const char* answer);
 static void retryJoinCallback(void);
 static void printJoiningWaitStatus(void);
 static void resetPlayerAfterJudgeLost(void);
+static void handleJoinAbort(void);
 static uint8_t enterPlayingFromSetup(const L3Message* msg);
 static void trimNickname(char* nickname);
 static uint8_t isMyNickname(const char* nickname);
@@ -143,10 +144,19 @@ static void stateWaitAck(void)
         uint8_t  size    = L3_LLI_getSize();
         L3MsgType type    = L3_msg_peekType(dataPtr, size);
 
-        if (type != L3_MSG_JOIN_ACK && type != L3_MSG_SETUP) return;
+        if (type != L3_MSG_JOIN_ACK &&
+            type != L3_MSG_SETUP &&
+            type != L3_MSG_JOIN_ABORT) {
+            return;
+        }
 
         L3Message msg;
         if (!L3_msg_deserialize(dataPtr, size, &msg)) return;
+
+        if (type == L3_MSG_JOIN_ABORT) {
+            handleJoinAbort();
+            return;
+        }
 
         // JOIN_ACK를 놓친 노드도 SETUP broadcast에 포함되어 있으면 게임에 합류한다.
         if (type == L3_MSG_SETUP) {
@@ -278,6 +288,11 @@ static void stateJoining(void)
     // [R-SETUP-06] SETUP 이전 TURN 무시
     if (type == L3_MSG_TURN) {
         pc.printf("[Player] JOINING: ignoring TURN before SETUP\r\n");
+        return;
+    }
+
+    if (type == L3_MSG_JOIN_ABORT) {
+        handleJoinAbort();
         return;
     }
 
@@ -487,6 +502,23 @@ static void resetPlayerAfterJudgeLost(void)
     judgeWaitTimerActive = 0;
     judgeWaitTimer.stop();
     joiningProbePending = 0;
+    myNickname[0]        = '\0';
+    L3_clearInputWord();
+    playerState = PLAYER_STATE_IDLE;
+}
+
+static void handleJoinAbort(void)
+{
+    pc.printf("[Player] Not enough players joined in time.\r\n");
+    pc.printf("[Player] Reset this board and wait for a new game setup.\r\n");
+    L3_timer_stopTimer();
+    L3_369engine_reset();
+    isJudgeKnown         = 0;
+    joinRetryCount       = 0;
+    waitAckRetryPending  = 0;
+    judgeWaitTimerActive = 0;
+    joiningProbePending  = 0;
+    judgeWaitTimer.stop();
     myNickname[0]        = '\0';
     L3_clearInputWord();
     playerState = PLAYER_STATE_IDLE;

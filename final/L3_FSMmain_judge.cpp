@@ -19,6 +19,9 @@ static uint8_t judge_participant_count = 0;
 static char    judge_participants[L3_JUDGE_MAX_PARTICIPANTS][L3_MAX_NICKNAME_LEN];
 static uint8_t judge_participant_node_ids[L3_JUDGE_MAX_PARTICIPANTS];
 static uint8_t current_turn_player_idx = 0;
+static Timer joinPhaseTimer;
+static uint8_t joinPhaseTimerActive = 0;
+static uint8_t joinPhaseClosed = 0;
 
 // 송신(TX) buffer
 static uint8_t judge_txBuf[L3_MAXDATASIZE];
@@ -45,6 +48,10 @@ void L3_judge_initIDLE(void)
 {
     judge_participant_count = 0;
     current_turn_player_idx = 0;
+    joinPhaseTimer.reset();
+    joinPhaseTimer.start();
+    joinPhaseTimerActive = 1;
+    joinPhaseClosed = 0;
     L3_369engine_reset();
 
     for (int i = 0; i < L3_JUDGE_MAX_PARTICIPANTS; i++) {
@@ -58,6 +65,8 @@ void L3_judge_initIDLE(void)
     debug_if(DBGMSG_L3,
              "[Judge] IDLE initialized. node_id=%u, waiting for JOIN...\n",
              (unsigned)L3_JUDGE_NODE_ID);
+    pc.printf("[Judge] Join timer started. Waiting up to %d seconds for 4 players.\r\n",
+              L3_JOIN_PHASE_TIMEOUT_SEC);
 }
 
 // State accessors
@@ -221,6 +230,33 @@ void L3_judge_handleIDLE(void)
 {
     static uint8_t init_step = 0;
 
+    if (joinPhaseTimerActive &&
+        judge_participant_count < L3_JUDGE_MAX_PARTICIPANTS &&
+        joinPhaseTimer.read_ms() >= (L3_JOIN_PHASE_TIMEOUT_SEC * 1000)) {
+        L3Message abortMsg;
+        memset(&abortMsg, 0, sizeof(abortMsg));
+        abortMsg.type = L3_MSG_JOIN_ABORT;
+
+        pc.printf("[Judge] Not enough players joined within %d seconds.\r\n",
+                  L3_JOIN_PHASE_TIMEOUT_SEC);
+        if (judge_participant_count > 0) {
+            pc.printf("[Judge] Broadcasting restart notice to players.\r\n");
+            judge_sendMessage(&abortMsg, L3_BROADCAST_ID);
+        } else {
+            pc.printf("[Judge] No players joined.\r\n");
+        }
+        pc.printf("[Judge] Reset this board and start a new setup.\r\n");
+        joinPhaseTimerActive = 0;
+        joinPhaseClosed = 1;
+        joinPhaseTimer.stop();
+        L3_event_clearEventFlag(L3_event_msgRcvd);
+        return;
+    }
+
+    if (joinPhaseClosed) {
+        return;
+    }
+
     if (init_step == 1) {
         // JOIN_ACK 전송 완료 대기
         if (L3_event_checkEventFlag(L3_event_dataSendCnf)) {
@@ -375,6 +411,8 @@ void L3_judge_handleIDLE(void)
     debug_if(DBGMSG_L3,
              "[Judge] [R-JOIN-05] Join Phase complete (%d participants).\n",
              L3_JUDGE_MAX_PARTICIPANTS);
+    joinPhaseTimerActive = 0;
+    joinPhaseTimer.stop();
 
     // 바로 SETUP을 보내면 L2 버퍼에서 방금 보낸 JOIN_ACK를 덮어쓰게 되므로,
     // 보조 변수 init_step을 1로 바꾸어 다음 전송 완료(dataSendCnf)를 대기
