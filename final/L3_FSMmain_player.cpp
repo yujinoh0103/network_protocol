@@ -29,6 +29,39 @@ static Timer judgeWaitTimer;
 static uint8_t judgeWaitTimerActive = 0;
 static uint8_t joiningProbePending = 0;
 
+// 키보드 입력 관련 변수
+static char inputBuffer[L3_MAX_VALUE_LEN];
+static uint8_t inputLen = 0;
+static uint8_t inputReady = 0;
+
+// -------------------------------------------------------
+// 키보드 인터럽트 처리 (사용자 입력)
+// -------------------------------------------------------
+static void L3service_processInputWord(void)
+{
+    char c = pc.getc();
+    if (!inputReady)
+    {
+        if (c == '\r\n' || c == '\r')
+        {
+            inputBuffer[inputLen] = '\0';
+            inputReady = 1;
+            pc.printf("\r\n[Player] Typed: %s\r\n", inputBuffer);
+        }
+        else
+        {
+            inputBuffer[inputLen++] = c;
+            pc.putc(c); // 터미널 에코
+            if (inputLen >= L3_MAX_VALUE_LEN - 1)
+            {
+                inputBuffer[inputLen] = '\0';
+                inputReady = 1;
+                pc.printf("\r\n[Player] Max reached! Typed: %s\r\n", inputBuffer);
+            }
+        }
+    }
+}
+
 // -------------------------------------------------------
 // Forward declarations
 // -------------------------------------------------------
