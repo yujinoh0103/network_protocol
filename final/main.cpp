@@ -10,27 +10,72 @@ Serial pc(USBTX, USBRX);
 
 //source/destination ID
 uint8_t input_thisId=1;
-uint8_t input_destId=0;
 
 //FSM operation implementation ------------------------------------------------
 int main(void){
 
     //initialization
-    pc.printf("------------------ protocol stack starts! --------------------------\n");
+    pc.printf(
+        "\r\n\r\n"
+        "=================================\r\n"
+        "*                 369 GAME START!                 *\r\n"
+        "=================================\r\n"
+        "\r\n"
+        "Welcome to the 369 Star Game! :D\r\n"
+        "\r\n"
+        "[HOW TO PLAY]\r\n"
+        "Type the right answer on your turn.\r\n"
+        "If the number has 3, 6, or 9, type \"*\".\r\n"
+        "Examples: 3 -> *, 13 -> *, 33 -> **, 36 -> **\r\n"
+        "Turn time gets shorter: 10s, 7s, then 5s.\r\n"
+        "\r\n"
+        "[SETTING]\r\n"
+        "Node 0 is Judge. Other nodes are Players.\r\n"
+        "Only one Judge is allowed.\r\n"
+        "Nickname: English only, max 8 chars.\r\n"
+        "\r\n"
+        "[FLOW]\r\n"
+        "4 players join. One elimination ends the game.\r\n"
+        "Then players enter a new nickname to retry.\r\n"
+        "\r\n"
+        "=================================\r\n"
+    );
         //source & destination ID setting
-    pc.printf(":: ID for this node : ");
-    pc.scanf("%d", &input_thisId);
-    pc.printf(":: ID for the destination : ");
-    pc.scanf("%d", &input_destId);
+    int nodeInput = 0;
+    int judgeConfirm = 0;
+
+    while (1) {
+        pc.printf("\r\nNode number > ");
+        pc.scanf("%d", &nodeInput);
+
+        if (nodeInput != 0) {
+            input_thisId = (uint8_t)nodeInput;
+            break;
+        }
+
+        pc.printf("[Judge] Node 0 is Judge mode.\r\n");
+        pc.printf("[Judge] Only ONE board can use Node 0.\r\n");
+        pc.printf("[Judge] Is this the only Judge? yes=1, no=0 > ");
+        pc.scanf("%d", &judgeConfirm);
+
+        if (judgeConfirm == 1) {
+            input_thisId = 0;
+            pc.printf("[Judge] Judge mode confirmed.\r\n");
+            break;
+        }
+
+        pc.printf("[Judge] Existing Judge detected by user.\r\n");
+        pc.printf("[Judge] Enter a Player node number instead.\r\n");
+    }
     pc.getc();
 
-    pc.printf("endnode : %i, dest : %i\n", input_thisId, input_destId);
+    pc.printf("Node=%i\r\n", input_thisId);
     
     
 
     //initialize lower layer stacks
     L2_initFSM(input_thisId);
-    L3_initFSM(input_destId);
+    L3_initFSM(0);
     
     while(1)
     {

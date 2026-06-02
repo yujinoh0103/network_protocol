@@ -148,7 +148,7 @@ int L2_aggregateData(uint8_t* dataPtr, uint8_t srcId, uint8_t size, uint8_t brfl
     pduBufferSize+=size-L2_MSG_OFFSET_DATA;
 
     debug_if(DBGMSG_L2, "[L2] Aggregation PDU : size : %i end : %i\n", pduBufferSize, flag_end);
-    if (brflag == 1 || flag_end == 1)
+    if (flag_end == 1)
     {
         L3_LLI_dataInd(pduBuffer, srcId, pduBufferSize, L2_LLI_getSnr(), L2_LLI_getRssi());
         pduBufferSize = 0;
@@ -196,11 +196,10 @@ void L2_FSMrun(void)
 
                 //L3_LLI_dataInd(L2_msg_getWord(dataPtr), srcId, size-L2_MSG_OFFSET_DATA, L2_LLI_getSnr(), L2_LLI_getRssi());
 #ifndef DISABLE_ARQ                
-                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr))
-                    debug("[L3][WARNING] Invalid PDU SN (%i) while (%i) is required! discarding it...\n", L2_msg_getSeq(dataPtr), seqNum);
-                else
+                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr)) {
+                }
 #endif
-                    L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);
+                L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);
 
 
 #ifdef DISABLE_ARQ
@@ -302,7 +301,9 @@ void L2_FSMrun(void)
                     if (destL2ID == L2_BROADCAST_ID)
                     {
                         main_state = L2STATE_IDLE;
-                         L3_LLI_dataCnf(1);
+                        if (!L2_event_checkEventFlag(L2_event_dataToSendBuffer)) {
+                            L3_LLI_dataCnf(1);
+                        }
                     }
                     else
                     {
@@ -324,7 +325,7 @@ void L2_FSMrun(void)
                 uint8_t* dataPtr = L2_LLI_getRcvdDataPtr();
                 if ( L2_msg_getSeq(arqPdu) == L2_msg_getSeq(dataPtr) )
                 {
-                    debug_if(DBGMSG_L2, "[L2] ACK is correctly received! \n");
+                    debug("[L2] ACK is correctly received! \n");
                     L2_timer_stopTimer();
                     main_state = L2STATE_IDLE;
                     L3_LLI_dataCnf(1);
@@ -368,11 +369,10 @@ void L2_FSMrun(void)
 
                 //L3_LLI_dataInd(L2_msg_getWord(dataPtr), srcId, size-L2_MSG_OFFSET_DATA, L2_LLI_getSnr(), L2_LLI_getRssi());
 #ifndef DISABLE_ARQ                
-                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr))
-                    debug("[L3][WARNING] Invalid PDU SN (%i) while (%i) is required! discarding it...\n", L2_msg_getSeq(dataPtr), seqNum);
-                else
+                if (brflag == 0 && seqNum != L2_msg_getSeq(dataPtr)) {
+                }
 #endif
-                    L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);            
+                L2_aggregateData(dataPtr, srcId, size, brflag, flag_end);
 
 #ifdef DISABLE_ARQ
                 main_state = L2STATE_IDLE;

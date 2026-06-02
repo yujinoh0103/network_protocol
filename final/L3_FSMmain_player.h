@@ -8,19 +8,20 @@
 extern "C" {
 #endif
 
-// Player FSM States
+// Player FSM States (spec 10.2 기준)
 typedef enum {
-    PLAYER_STATE_IDLE = 0,
-    PLAYER_STATE_WAIT_ACK,
-    PLAYER_STATE_JOINING,
-    PLAYER_STATE_PLAYING
+    PLAYER_STATE_IDLE     = 0,  // 닉네임 입력 대기 → JOIN 전송 트리거
+    PLAYER_STATE_WAIT_ACK = 1,  // JOIN_ACK 대기
+    PLAYER_STATE_JOINING  = 2,  // SETUP 대기 (순번 확정 전)
+    PLAYER_STATE_PLAYING  = 3,  // 게임 진행 중
+    PLAYER_STATE_HALTED   = 4   // reset 전까지 입력 무시
 } PlayerState;
 
-// Player FSM init & run
-void L3_player_initFSM(const char* nickname);
+// Player FSM 진입점
+void L3_player_initFSM(void);
 void L3_player_runFSM(void);
 
-// State getter (for debug/test)
+// 상태 조회 (디버그/테스트용)
 PlayerState L3_player_getState(void);
 const char* L3_player_getStateString(void);
 

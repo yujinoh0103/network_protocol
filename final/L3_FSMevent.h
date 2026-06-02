@@ -4,7 +4,7 @@ typedef enum L3_event
     L3_event_dataToSend = 4,
     L3_event_dataSendCnf = 5,
     L3_event_recfgSrcIdCnf = 6,
-    L3_event_arqTimeout = 7
+    L3_event_arqTimeout    = 7  // WAIT_ACK 타이머 만료 (player Join Phase)
 } L3_event_e;
 
 

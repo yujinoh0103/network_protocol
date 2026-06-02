@@ -9,6 +9,7 @@ static uint8_t rcvdSize;
 static int16_t rcvdRssi;
 static int8_t rcvdSnr;
 static uint8_t rcvdSrcId;
+static uint8_t lastDataCnfResult;
 
 //Downward primitives
 //TX function
@@ -18,8 +19,6 @@ void (*L3_LLI_reconfigSrcIdReqFunc)(uint8_t myId);
 //interface event : DATA_IND, RX data has arrived
 void L3_LLI_dataInd(uint8_t* dataPtr, uint8_t srcId, uint8_t size, int8_t snr, int16_t rssi)
 {
-    debug_if(DBGMSG_L3, "\n[L3] --> DATA IND : size:%i, %s\n", size, dataPtr);
-
     memcpy(rcvdMsg, dataPtr, size*sizeof(uint8_t));
     rcvdSize = size;
     rcvdSnr = snr;
@@ -31,12 +30,11 @@ void L3_LLI_dataInd(uint8_t* dataPtr, uint8_t srcId, uint8_t size, int8_t snr, i
 
 void L3_LLI_dataCnf(uint8_t res)
 {
-    debug_if(DBGMSG_L3, "\n --> DATA CNF : res : %i\n", res);
+    lastDataCnfResult = res;
     L3_event_setEventFlag(L3_event_dataSendCnf);
 }
 void L3_LLI_reconfigSrcIdCnf(uint8_t res)
 {
-    debug_if(DBGMSG_L3, "\n --> RECONFIG SRCID CNF : res : %i\n", res);
     L3_event_setEventFlag(L3_event_recfgSrcIdCnf);
 }
 
@@ -53,6 +51,11 @@ uint8_t L3_LLI_getSize()
 uint8_t L3_LLI_getSrcId()
 {
     return rcvdSrcId;
+}
+
+uint8_t L3_LLI_getLastDataCnfResult()
+{
+    return lastDataCnfResult;
 }
 
 void L3_LLI_setDataReqFunc(void (*funcPtr)(uint8_t*, uint8_t, uint8_t))

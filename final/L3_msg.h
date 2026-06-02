@@ -18,6 +18,9 @@
 #define L3_BROADCAST_ID 255
 #define L3_MSG_MAX_SERIAL_LEN 128 
 
+#define L3_JOIN_REJECT_NODE_ID 0
+#define L3_JOIN_REJECT_NICKNAME 254
+
 typedef enum {
     L3_MSG_JOIN = 0,
     L3_MSG_JOIN_ACK,
@@ -25,6 +28,7 @@ typedef enum {
     L3_MSG_TURN,
     L3_MSG_ANSWER,
     L3_MSG_GAMEOVER,
+    L3_MSG_JOIN_ABORT,
     L3_MSG_UNKNOWN
 } L3MsgType;
 
