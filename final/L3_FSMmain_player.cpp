@@ -77,6 +77,7 @@ void L3_player_runFSM(void)
         case PLAYER_STATE_WAIT_ACK: stateWaitAck();  break;
         case PLAYER_STATE_JOINING:  stateJoining();  break;
         case PLAYER_STATE_PLAYING:  statePlaying();  break;
+        case PLAYER_STATE_HALTED:   L3_clearInputWord(); break;
         default: break;
     }
 }
@@ -185,7 +186,8 @@ static void stateWaitAck(void)
             myNickname[0] = '\0';
             joinRetryCount = 0;
             waitAckRetryPending = 0;
-            playerState = PLAYER_STATE_IDLE;
+            L3_clearInputWord();
+            playerState = PLAYER_STATE_HALTED;
             return;
         }
         if (msg.body.join_ack.registered_count == L3_JOIN_REJECT_NICKNAME) {
@@ -573,6 +575,7 @@ const char* L3_player_getStateString(void)
         case PLAYER_STATE_WAIT_ACK: return "WAIT_ACK";
         case PLAYER_STATE_JOINING:  return "JOINING";
         case PLAYER_STATE_PLAYING:  return "PLAYING";
+        case PLAYER_STATE_HALTED:   return "HALTED";
         default:                    return "UNKNOWN";
     }
 }

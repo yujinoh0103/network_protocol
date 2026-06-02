@@ -13,7 +13,8 @@ typedef enum {
     PLAYER_STATE_IDLE     = 0,  // 닉네임 입력 대기 → JOIN 전송 트리거
     PLAYER_STATE_WAIT_ACK = 1,  // JOIN_ACK 대기
     PLAYER_STATE_JOINING  = 2,  // SETUP 대기 (순번 확정 전)
-    PLAYER_STATE_PLAYING  = 3   // 게임 진행 중
+    PLAYER_STATE_PLAYING  = 3,  // 게임 진행 중
+    PLAYER_STATE_HALTED   = 4   // reset 전까지 입력 무시
 } PlayerState;
 
 // Player FSM 진입점
